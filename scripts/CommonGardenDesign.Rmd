@@ -1,0 +1,122 @@
+---
+title: "Common Garden Design"
+output: html_notebook
+---
+
+## Intro
+
+Goal: decide number of pops, maternal families, etc.  Then planting design.
+Parameters: maximize number of pops, then number of maternal families.  Plant 2000.
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(ggforce)
+
+is.even <- function(x) x%%2 == 0
+```
+
+## get data on pops and families
+
+```{r}
+pops <- read_sheet("https://docs.google.com/spreadsheets/d/1dif9Y5hbkSa56Bgonj04-jXh8jNc6f13RBS6BPUf1IQ",
+                   skip=1,
+                   na=c("NA", ""),
+                   col_types = c("ciiicccc"),
+                   .name_repair = "universal") %>%
+  mutate(approx.number.seeds = as.integer(str_remove_all(approx.number.seeds,"[^0-9]")))
+
+pops
+```
+## filter to one entry per pop, etc
+
+```{r}
+pops.filtered <- pops %>% group_by(parent.pop) %>% slice_max(order_by=maternal.families) %>%
+  filter(approx.number.seeds >= 100) %>%
+  filter(!(parent.pop %in% c("HH", "RB"))) # old seed
+
+pops.filtered %>% arrange(maternal.families)
+```
+
+```{r}
+sum(pops.filtered$maternal.families>=8)
+```
+
+```{r}
+sum(pops.filtered$maternal.families>=15)
+```
+
+### Scenario 1:
+
+Plant 21 pops * 8 families * 12 reps (= 2016 plants)
+
+### Scenario 2:
+
+Plant 11 pops * 15 families * 12 reps (= 1980 plants)
+
+### Scenario 3:
+
+3 mfs from WV, 4 mfs WR and 7 mfs from everyone else
+
+total mfs = 3+4+7*21 = 168 * 13 reps (= 2002 plants)
+
+## planting grid
+
+2000 plants.  think of 10 blocks of 200
+
+200 = 4*50
+
+### plan 1
+
+Create grid
+```{r}
+plants <- 2000
+blocks <- 10
+columns <- 4
+rows <- plants/blocks/columns
+size <- 20 # plant diameter
+radius <- size/2 
+aisle <- 90
+
+plan1 <- expand_grid(block=LETTERS[1:blocks],
+                     column=1:columns,
+                     row=1:rows,
+                     radius=radius)
+
+plan1
+```
+
+add positions
+```{r}
+column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
+plan1 <- plan1 %>%
+  mutate(y_pos=ifelse(is.even(column),
+                      row*size,
+                      row*size-radius),
+         x_pos=ifelse(column==1,
+                      radius,
+                      radius+(column-1)*column_offset))
+plan1
+```
+
+```{r, fig.width=10}
+plan1 %>% #filter(block=="A", row <6) %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal() +
+  facet_wrap(~block, ncol = 10)
+
+```
+update to position blocks
+```{r, fig.width=12}
+# only offset x_positions (1 "row" of blocks)
+plan1 <- plan1 %>%
+  mutate(block_x_offset = as.integer(as.factor(block))-1,
+    block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
+
+plan1 %>% #filter(block=="A", row <6) %>%
+  ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal() 
+```
+
