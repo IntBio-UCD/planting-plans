@@ -22,7 +22,7 @@ is.even <- function(x) x%%2 == 0
 pops <- read_sheet("https://docs.google.com/spreadsheets/d/1dif9Y5hbkSa56Bgonj04-jXh8jNc6f13RBS6BPUf1IQ",
                    skip=1,
                    na=c("NA", ""),
-                   col_types = c("ciiicccc"),
+                   col_types = c("ciiiccccc"),
                    .name_repair = "universal") %>%
   mutate(approx.number.seeds = as.integer(str_remove_all(approx.number.seeds,"[^0-9]")))
 
@@ -119,4 +119,20 @@ plan1 %>% #filter(block=="A", row <6) %>%
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal() 
 ```
+
+## Which pops?
+
+The group decision was to go with scenario 3: "3 mfs from WV, 4 mfs WR and 7 mfs from everyone else"
+
+This is the full (filtered) data sheet.
+
+```{r}
+pops.filtered %>% arrange(parent.pop) %>% write_csv("../output/Pops_for_2022_UCD.csv")
+```
+
+
+
+
+
+
 
