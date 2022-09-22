@@ -22,7 +22,7 @@ is.even <- function(x) x%%2 == 0
 pops <- read_sheet("https://docs.google.com/spreadsheets/d/1dif9Y5hbkSa56Bgonj04-jXh8jNc6f13RBS6BPUf1IQ",
                    skip=1,
                    na=c("NA", ""),
-                   col_types = c("ciiicccc"),
+                   col_types = c("ciiiccccc"),
                    .name_repair = "universal") %>%
   mutate(approx.number.seeds = as.integer(str_remove_all(approx.number.seeds,"[^0-9]")))
 
@@ -56,67 +56,110 @@ Plant 11 pops * 15 families * 12 reps (= 1980 plants)
 
 ### Scenario 3:
 
-3 mfs from WV, 4 mfs WR and 7 mfs from everyone else
+__Note: after calculating above, Sarah found more mfs from WV, so:_
 
-total mfs = 3+4+7*21 = 168 * 13 reps (= 2002 plants)
+3 mfs from WR and 7 mfs from everyone else
+
+total mfs = 3+7*22 = 157 * 13 reps (= 2041 plants)
 
 ## planting grid
 
-2000 plants.  think of 10 blocks of 200
+### go with plan 3
 
-200 = 4*50
+2041 plants.  1 block per rep, so 13 blocks each of 157 plants
 
-### plan 1
+157/4 = 39.25 with 4 columns this is 39.25 plants per column per block.  Call it 40
 
 Create grid
 ```{r}
-plants <- 2000
-blocks <- 10
+blocks <- 13
 columns <- 4
-rows <- plants/blocks/columns
+rows <- 40
+plants <- blocks * columns * rows
 size <- 20 # plant diameter
 radius <- size/2 
 aisle <- 90
 
-plan1 <- expand_grid(block=LETTERS[1:blocks],
+plan3 <- expand_grid(block=LETTERS[1:blocks],
                      column=1:columns,
                      row=1:rows,
                      radius=radius)
 
-plan1
+plan3
 ```
 
 add positions
 ```{r}
 column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
-plan1 <- plan1 %>%
+plan3 <- plan3 %>%
   mutate(y_pos=ifelse(is.even(column),
                       row*size,
                       row*size-radius),
          x_pos=ifelse(column==1,
                       radius,
                       radius+(column-1)*column_offset))
-plan1
+plan3
 ```
-
-```{r, fig.width=10}
-plan1 %>% #filter(block=="A", row <6) %>%
-  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
-  geom_circle(fill="lightgreen", alpha=.25) + 
-  coord_equal() +
-  facet_wrap(~block, ncol = 10)
-
-```
-update to position blocks
+Plot it
 ```{r, fig.width=12}
 # only offset x_positions (1 "row" of blocks)
-plan1 <- plan1 %>%
+plan3 <- plan3 %>%
   mutate(block_x_offset = as.integer(as.factor(block))-1,
     block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
 
-plan1 %>% #filter(block=="A", row <6) %>%
+#create block labels
+block.labels <- plan3 %>%
+  group_by(block) %>%
+  summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
+
+
+plan3 %>% #filter(block=="A", row <6) %>%
   ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
-  coord_equal() 
+  coord_equal() + 
+  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
+  xlab("position (cm)") + ylab("position (cm)")
+```
+
+Alternate, what if we stack blocks
+
+```{r, fig.width=12}
+# only offset x_positions (1 "row" of blocks)
+plan3 <- plan3 %>%
+  mutate(block_x_offset = as.integer(as.factor(block)) %% 7 -1,
+    block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
+  mutate(block_y_offset = (as.integer(as.factor(block)) %/% 7)*-1+1 ,
+         block_y_offset = block_y_offset*size*rows+block_y_offset*aisle*1.5)
+
+#create block labels
+block.labels <- plan3 %>%
+  group_by(block) %>%
+  summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(block_y_offset + y_pos*1.075))
+
+
+plan3 %>% #filter(block=="A", row <6) %>%
+  ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos+block_y_offset, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal() + 
+  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
+  xlab("position (cm)") + ylab("position (cm)")
+```
+
+```{r}
+plants  <- read_sheet("  https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+                      sheet="label making")
+
+plants 
+",
+                   skip=1,
+                   na=c("NA", ""),
+                   col_types = c("ciiiccccc"),
+                   .name_repair = "universal") %>%
+  mutate(approx.number.seeds = as.integer(str_remove_all(approx.number.seeds,"[^0-9]")))
+
+pops
+  
 ```
 
