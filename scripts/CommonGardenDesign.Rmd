@@ -163,12 +163,36 @@ plants  <- read_sheet("  https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35
 
 plants 
 ```
-
+set up row labels for sampling 
 ```{r}
+rows.sample <- rep(1:rows, times=c(rep(columns,rows-1), 1) )
 
+#cols.sample <- rep(LETTERS[1:columns], times=c(rows, rep(rows-1, columns-1)))
 ```
 
+Add block (easy because block = rep, but I am using letters for block)
+```{r}
+plants <- plants %>% mutate(block=LETTERS[rep])
+```
+now add row and column positions:
 
+```{r}
+set.seed(092222) # so we get the same "randomization" each time we run this
+plants <- plants %>%
+  group_by(block) %>%
+  mutate(row=sample(rows.sample)) %>%
+  group_by(block, row) %>%
+  mutate(col=sample(LETTERS[1:columns], size=n()))
 
+plants %>% arrange(parent.pop, mf) # confirm different positions per block
+```
 
+now add flat into for the growth chamber.  flats are 7 X 14.  We don't have space to do 4 rows per flat, so we will do 7 rows per flat and spread them out day of planting
+
+```{r}
+plants <- plants %>%
+  arrange(block, row, col)
+
+plants
+```
 
