@@ -115,7 +115,7 @@ Plot it
 # only offset x_positions (1 "row" of blocks)
 plan3 <- plan3 %>%
   mutate(block_x_offset = as.integer(as.factor(block))-1,
-    block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
+         block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
 
 #create block labels
 block.labels <- plan3 %>%
@@ -138,7 +138,7 @@ Alternate, what if we stack blocks
 # only offset x_positions (1 "row" of blocks)
 plan3 <- plan3 %>%
   mutate(block_x_offset = as.integer(as.factor(block)) %% 7 -1,
-    block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
+         block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
   mutate(block_y_offset = (as.integer(as.factor(block)) %/% 7)*-1+1 ,
          block_y_offset = block_y_offset*size*rows+block_y_offset*aisle*1.5)
 
@@ -158,7 +158,7 @@ plan3 %>% #filter(block=="A", row <6) %>%
 ```
 
 ```{r}
-plants  <- read_sheet("  https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+plants  <- read_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
                       sheet="label making")
 
 plants 
@@ -189,10 +189,53 @@ plants %>% arrange(parent.pop, mf) # confirm different positions per block
 
 now add flat into for the growth chamber.  flats are 7 X 14.  We don't have space to do 4 rows per flat, so we will do 7 rows per flat and spread them out day of planting
 
+We have a total of 13 * 4 = 52 columns.  8 flats have a total of 56 columns.
+
 ```{r}
-plants <- plants %>%
-  arrange(block, row, col)
+plants <- plants %>% ungroup() %>%
+  mutate(ubercolumn = as.integer(factor(str_c(block, col))),
+         flat = (ubercolumn + 6) %/% 7, # column assignments to flat (7 columns per flat)
+         flat = flat + ((row-1) %/% 14)*8) # adjust for row (14 rows per flat, 8 flats per row of flats)
 
 plants
+
+tail(plants)
+```
+
+plot flatmaps
+```{r, fig.height=10, fig.width=7.5}
+
+flat.plots <- map(unique(plants$flat), function(f) {
+
+  plants.flat <- plants %>% filter(flat==f) %>%
+    mutate(label=str_c(parent.pop, "-", mf, "\n", block, "-", row, col))
+  
+  row.labels <- plants.flat %>% pull(row) %>% unique() %>% sort()
+  col.labels <- plants.flat %>% pull(ubercolumn) %>% unique() %>% sort()
+  
+  plants.flat %>%  ggplot(aes(x=ubercolumn, y=row, x0=ubercolumn, y0 = row, label=label)) +
+    geom_tile(fill="white", color="black") +
+    coord_equal(expand = FALSE) +
+    geom_text(size=3) +
+    scale_y_reverse(labels=row.labels, breaks=row.labels) +
+    scale_x_continuous(labels=col.labels, breaks=col.labels) +
+    ggtitle(str_c("Flat ", f)) 
+}
+)
+```
+
+```{r, fig.height=10, fig.width=7.5}
+flat.plots[[1]]
+```
+
+```{r}
+pdf(file="../output/flatmaps.pdf", width=7.5, height = 10)
+walk(flat.plots, print)
+dev.off()
+```
+
+```{r}
+plants %>% arrange(parent.pop, mf, rep) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+                       sheet="Flat and Block map")
 ```
 
