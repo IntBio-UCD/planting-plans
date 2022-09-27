@@ -127,9 +127,11 @@ plan3 %>% #filter(block=="A", row <6) %>%
   ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal() + 
-  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
-  theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
+  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (cm)") + ylab("position (cm)")
+
+ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
 
 Alternate, what if we stack blocks
