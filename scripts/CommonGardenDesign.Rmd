@@ -76,63 +76,150 @@ pops.filtered %>% arrange(parent.pop) %>% write_csv("../output/Pops_for_2022_UCD
 
 ### go with plan 3
 
+### Example plot for "30 in veg crop" bed.
+
+Sarah says this is 30 cm of plantable width.  
+
 2041 plants.  1 block per rep, so 13 blocks each of 157 plants
 
-157/4 = 39.25 with 4 columns this is 39.25 plants per column per block.  Call it 40
+157/4 = 39.25 with 4 columns this is 39.25 plants per column per block.  Call it 40.  But then two more buffers on each side, call it 48
 
 Create grid
 ```{r}
+stagger <- FALSE
 blocks <- 13
-columns <- 4
-rows <- 40
+columns <- 4 # per block
+rows <- 48
 plants <- blocks * columns * rows
-size <- 20 # plant diameter
-radius <- size/2 
-aisle <- 90
+bedwidth <- 76.2 # cm
+size <- 30 # plant diameter
+radius <- plantsize/2 
+blankevery <- 2 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
+expandfactor <- blankevery/(blankevery-1)
 
 plan3 <- expand_grid(block=LETTERS[1:blocks],
                      column=1:columns,
                      row=1:rows,
                      radius=radius)
 
+plan3 <- plan3 %>%
+  mutate(plantedcol=(match(block, LETTERS)-1)*4 + column,
+         bedcol = floor((plantedcol -1)*expandfactor + 1   )) 
+
 plan3
 ```
 
 add positions
 ```{r}
-column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
-plan3 <- plan3 %>%
-  mutate(y_pos=ifelse(is.even(column),
-                      row*size,
-                      row*size-radius),
-         x_pos=ifelse(column==1,
-                      radius,
-                      radius+(column-1)*column_offset))
+if (stagger) {
+  ## first part needs to be updated for beds
+  column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
+  plan3 <- plan3 %>%
+    mutate(y_pos=ifelse(is.even(column),
+                        row*size, 
+                        row*size-radius),
+           x_pos=ifelse(column==1,
+                        radius,
+                        radius+(column-1)*column_offset))
+} else {
+  plan3 <- plan3 %>%
+    mutate(y_pos=row*size,
+           x_pos=bedcol*bedwidth)
+}
 plan3
 ```
 Plot it
 ```{r, fig.width=12}
 # only offset x_positions (1 "row" of blocks)
-plan3 <- plan3 %>%
-  mutate(block_x_offset = as.integer(as.factor(block))-1,
-         block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
+# plan3 <- plan3 %>%
+#   mutate(block_x_offset = as.integer(as.factor(block))-1,
+#          block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
 
 #create block labels
-block.labels <- plan3 %>%
-  group_by(block) %>%
-  summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
+# block.labels <- plan3 %>%
+#   group_by(block) %>%
+#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
 
 
 plan3 %>% #filter(block=="A", row <6) %>%
-  ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos, r=radius)) +
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal() + 
-  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+#  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (cm)") + ylab("position (cm)")
 
-ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
+# ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
+
+
+```{r}
+stagger <- FALSE
+blocks <- 13
+columns <- 4 # per block
+rows <- 48
+plants <- blocks * columns * rows
+bedwidth <- 76.2 # cm
+size <- 30 # plant diameter
+radius <- plantsize/2 
+blankevery <- 3 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
+expandfactor <- blankevery/(blankevery-1)
+
+plan3 <- expand_grid(block=LETTERS[1:blocks],
+                     column=1:columns,
+                     row=1:rows,
+                     radius=radius)
+
+plan3 <- plan3 %>%
+  mutate(plantedcol=(match(block, LETTERS)-1)*4 + column,
+         bedcol = floor((plantedcol -1)*expandfactor + 1   )) 
+
+plan3
+```
+
+add positions
+```{r}
+if (stagger) {
+  ## first part needs to be updated for beds
+  column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
+  plan3 <- plan3 %>%
+    mutate(y_pos=ifelse(is.even(column),
+                        row*size, 
+                        row*size-radius),
+           x_pos=ifelse(column==1,
+                        radius,
+                        radius+(column-1)*column_offset))
+} else {
+  plan3 <- plan3 %>%
+    mutate(y_pos=row*size,
+           x_pos=bedcol*bedwidth)
+}
+plan3
+```
+Plot it
+```{r, fig.width=12}
+# only offset x_positions (1 "row" of blocks)
+# plan3 <- plan3 %>%
+#   mutate(block_x_offset = as.integer(as.factor(block))-1,
+#          block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset))
+
+#create block labels
+# block.labels <- plan3 %>%
+#   group_by(block) %>%
+#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
+
+
+plan3 %>% #filter(block=="A", row <6) %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal() + 
+#  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (cm)") + ylab("position (cm)")
+
+# ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
+```
+
 
 Alternate, what if we stack blocks
 
@@ -208,7 +295,7 @@ plot flatmaps
 ```{r, fig.height=10, fig.width=7.5}
 
 flat.plots <- map(unique(plants$flat), function(f) {
-
+  
   plants.flat <- plants %>% filter(flat==f) %>%
     mutate(label=str_c(parent.pop, "-", mf, "\n", block, "-", row, col))
   
@@ -238,6 +325,6 @@ dev.off()
 
 ```{r}
 plants %>% arrange(parent.pop, mf, rep) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
-                       sheet="Flat and Block map")
+                                                        sheet="Flat and Block map")
 ```
 
