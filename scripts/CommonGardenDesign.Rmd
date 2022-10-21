@@ -142,7 +142,7 @@ plan3 %>% #filter(block=="A", row <6) %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal() + 
-#  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (cm)") + ylab("position (cm)")
 
@@ -163,7 +163,7 @@ plan3 %>% #filter(block=="A", row <6) %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal(xlim = c(4,145)) + 
-#  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (feet)") + ylab("position (feet)") 
 
@@ -195,7 +195,7 @@ Alternate, what if we stack blocks (NOT UPDATED)
 #   theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
 #   xlab("position (cm)") + ylab("position (cm)")
 ```
-
+## Assign Plants
 ```{r}
 plants  <- read_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
                       sheet="label making")
@@ -204,7 +204,8 @@ plants
 ```
 set up row labels for sampling 
 ```{r}
-rows.sample <- rep(1:rows, times=c(rep(columns,rows-1), 1) )
+# because we have two buffer rows at the beginning and end, we start at row 3 and go to rows -2
+rows.sample <- rep(3:(rows-2), times=c(rep(columns,rows-5), 1) ) 
 
 #cols.sample <- rep(LETTERS[1:columns], times=c(rows, rep(rows-1, columns-1)))
 ```
@@ -225,8 +226,16 @@ plants <- plants %>%
 
 plants %>% arrange(parent.pop, mf) # confirm different positions per block
 ```
+Fill in the blanks...
+```{r}
+plants <- plants %>% expand(block, row=1:rows, col) %>% 
+  left_join(plants) %>%
+  mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop))
+plants
+```
 
-now add flat into for the growth chamber.  flats are 7 X 14.  We don't have space to do 4 rows per flat, so we will do 7 rows per flat and spread them out day of planting
+
+now add flat info for the growth chamber.  flats are 7 X 14.  We don't have space to do 4 rows per flat, so we will do 7 rows per flat and spread them out day of planting
 
 We have a total of 13 * 4 = 52 columns.  8 flats have a total of 56 columns.
 
@@ -241,13 +250,16 @@ plants
 tail(plants)
 ```
 
+
 plot flatmaps
 ```{r, fig.height=10, fig.width=7.5}
 
 flat.plots <- map(unique(plants$flat), function(f) {
   
   plants.flat <- plants %>% filter(flat==f) %>%
-    mutate(label=str_c(parent.pop, "-", mf, "\n", block, "-", row, col))
+    mutate(label=ifelse(is.na(mf),
+                        str_c(parent.pop, "\n", block, "-", row, col),
+                        str_c(parent.pop, "-", mf, "-r", rep, "\n", block, "-", row, col)))
   
   row.labels <- plants.flat %>% pull(row) %>% unique() %>% sort()
   col.labels <- plants.flat %>% pull(ubercolumn) %>% unique() %>% sort()
