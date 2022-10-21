@@ -171,29 +171,29 @@ plan3 %>% #filter(block=="A", row <6) %>%
 ```
 
 
-Alternate, what if we stack blocks
+Alternate, what if we stack blocks (NOT UPDATED)
 
 ```{r, fig.width=12}
-# only offset x_positions (1 "row" of blocks)
-plan3 <- plan3 %>%
-  mutate(block_x_offset = as.integer(as.factor(block)) %% 7 -1,
-         block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
-  mutate(block_y_offset = (as.integer(as.factor(block)) %/% 7)*-1+1 ,
-         block_y_offset = block_y_offset*size*rows+block_y_offset*aisle*1.5)
-
-#create block labels
-block.labels <- plan3 %>%
-  group_by(block) %>%
-  summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(block_y_offset + y_pos*1.075))
-
-
-plan3 %>% #filter(block=="A", row <6) %>%
-  ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos+block_y_offset, r=radius)) +
-  geom_circle(fill="lightgreen", alpha=.25) + 
-  coord_equal() + 
-  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
-  theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
-  xlab("position (cm)") + ylab("position (cm)")
+# # only offset x_positions (1 "row" of blocks)
+# plan3 <- plan3 %>%
+#   mutate(block_x_offset = as.integer(as.factor(block)) %% 7 -1,
+#          block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
+#   mutate(block_y_offset = (as.integer(as.factor(block)) %/% 7)*-1+1 ,
+#          block_y_offset = block_y_offset*size*rows+block_y_offset*aisle*1.5)
+# 
+# #create block labels
+# block.labels <- plan3 %>%
+#   group_by(block) %>%
+#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(block_y_offset + y_pos*1.075))
+# 
+# 
+# plan3 %>% #filter(block=="A", row <6) %>%
+#   ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos+block_y_offset, r=radius)) +
+#   geom_circle(fill="lightgreen", alpha=.25) + 
+#   coord_equal() + 
+#   geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
+#   theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
+#   xlab("position (cm)") + ylab("position (cm)")
 ```
 
 ```{r}
