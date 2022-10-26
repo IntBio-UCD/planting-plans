@@ -247,8 +247,9 @@ We have a total of 13 * 4 = 52 columns.  8 flats have a total of 56 columns.
 plants <- plants %>% ungroup() %>%
   mutate(ubercolumn = as.integer(factor(str_c(block, column))),
          flat = ifelse(row <= rows - buffer.rows, ((row - 1 ) %/% 14) + 1, NA), # row assignment for lat
-         flat = flat + ((ubercolumn - 1) %/% 7) * 3)  # column assignments to flat (7 columns per flat)
-
+         flat = flat + ((ubercolumn - 1) %/% 7) * 3,  # column assignments to flat (7 columns per flat)
+         flat_row = ((row-1) %% 14) + 1,
+         flat_column = LETTERS[((ubercolumn-1) %% 7) + 1])
 plants
 
 tail(plants)
@@ -259,7 +260,9 @@ Not using.  Can use if we want flats to run the other way in the field.
 plants <- plants %>% ungroup() %>%
   mutate(ubercolumn = as.integer(factor(str_c(block, column))),
          flat = (ubercolumn + 6) %/% 7, # column assignments to flat (7 columns per flat)
-         flat = flat + ((row-1) %/% 14)*8) # adjust for row (14 rows per flat, 8 flats per row of flats)
+         flat = flat + ((row-1) %/% 14)*8, # adjust for row (14 rows per flat, 8 flats per row of flats)
+         flat_row = ((row-1) %% 14) + 1,
+         flat_column = LETTERS[((ubercolumn-1) %% 7) + 1)]
 
 plants
 
@@ -302,7 +305,8 @@ dev.off()
 ```
 
 ```{r}
-plants %>% arrange(parent.pop, mf, rep) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+plants %>% arrange(parent.pop, mf, rep) %>%
+  select(parent.pop, mf, rep, flat, flat_row, flat_column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
                                                         sheet="Flat and Block map")
 ```
 
