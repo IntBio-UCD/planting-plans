@@ -87,10 +87,13 @@ Sarah says this is 100 cm of plantable width.
 Create grid
 ```{r}
 stagger <- TRUE
-blocks <- 15 # two of which are buffers
+buffer.blocks <- 2
+buffer.rows <- 2 # on each edge of each block
+exp.blocks <- 13
+blocks <- LETTERS[1:(buffer.blocks+exp.blocks)]
 columns <- 4 # per block
 rows <- 44 # four of which are buffers
-plants <- blocks * columns * rows
+plants <- length(blocks) * columns * rows
 bedwidth <- 100 # cm
 furrow <- 52 #cm
 size <- 30 # plant diameter
@@ -98,7 +101,7 @@ radius <- size/2
 blankevery <- 2 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
 expandfactor <- blankevery/(blankevery-1)
 
-plan3 <- expand_grid(block=LETTERS[1:blocks],
+plan3 <- expand_grid(block=blocks,
                      column=1:columns,
                      row=1:rows,
                      radius=radius)
@@ -146,7 +149,7 @@ plan3 %>% #filter(block=="A", row <6) %>%
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (cm)") + ylab("position (cm)")
 
-# ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
+ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
 
 Plot it in feet
@@ -210,9 +213,9 @@ rows.sample <- rep(3:(rows-2), times=c(rep(columns,rows-5), 1) )
 #cols.sample <- rep(LETTERS[1:columns], times=c(rows, rep(rows-1, columns-1)))
 ```
 
-Add block (easy because block = rep, but I am using letters for block)
+Add block (easy because block ~= rep, but I am using letters for block and need to adjust for the buffer rows)
 ```{r}
-plants <- plants %>% mutate(block=LETTERS[rep])
+plants <- plants %>% mutate(block=LETTERS[rep+(buffer.blocks/2)])
 ```
 now add row and column positions:
 
@@ -222,13 +225,14 @@ plants <- plants %>%
   group_by(block) %>%
   mutate(row=sample(rows.sample)) %>%
   group_by(block, row) %>%
-  mutate(col=sample(LETTERS[1:columns], size=n()))
+  mutate(column=sample(LETTERS[1:columns], size=n()))
 
 plants %>% arrange(parent.pop, mf) # confirm different positions per block
 ```
 Fill in the blanks...
 ```{r}
-plants <- plants %>% expand(block, row=1:rows, col) %>% 
+plants <- plants %>% ungroup() %>%
+  expand(block, row=1:rows, column) %>% 
   left_join(plants) %>%
   mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop))
 plants
@@ -239,9 +243,21 @@ now add flat info for the growth chamber.  flats are 7 X 14.  We don't have spac
 
 We have a total of 13 * 4 = 52 columns.  8 flats have a total of 56 columns.
 
-```{r}
+```{r, eval=TRUE}
 plants <- plants %>% ungroup() %>%
-  mutate(ubercolumn = as.integer(factor(str_c(block, col))),
+  mutate(ubercolumn = as.integer(factor(str_c(block, column))),
+         flat = ifelse(row <= rows - buffer.rows, ((row - 1 ) %/% 14) + 1, NA), # row assignment for lat
+         flat = flat + ((ubercolumn - 1) %/% 7) * 3)  # column assignments to flat (7 columns per flat)
+
+plants
+
+tail(plants)
+```
+
+Not using.  Can use if we want flats to run the other way in the field.
+```{r, eval=FALSE}
+plants <- plants %>% ungroup() %>%
+  mutate(ubercolumn = as.integer(factor(str_c(block, column))),
          flat = (ubercolumn + 6) %/% 7, # column assignments to flat (7 columns per flat)
          flat = flat + ((row-1) %/% 14)*8) # adjust for row (14 rows per flat, 8 flats per row of flats)
 
@@ -258,8 +274,8 @@ flat.plots <- map(unique(plants$flat), function(f) {
   
   plants.flat <- plants %>% filter(flat==f) %>%
     mutate(label=ifelse(is.na(mf),
-                        str_c(parent.pop, "\n", block, "-", row, col),
-                        str_c(parent.pop, "-", mf, "-r", rep, "\n", block, "-", row, col)))
+                        str_c(parent.pop, "\n", block, "-", row, column),
+                        str_c(parent.pop, "-", mf, "-r", rep, "\n", block, "-", row, column)))
   
   row.labels <- plants.flat %>% pull(row) %>% unique() %>% sort()
   col.labels <- plants.flat %>% pull(ubercolumn) %>% unique() %>% sort()
@@ -288,5 +304,42 @@ dev.off()
 ```{r}
 plants %>% arrange(parent.pop, mf, rep) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
                                                         sheet="Flat and Block map")
+```
+
+## combine flat map and field map
+
+Plot with flats super-imposed
+```{r, fig.width=12}
+
+plan3_flats <- plan3 %>%
+  mutate(column=LETTERS[column]) %>%
+  full_join(plants)
+
+
+flat_coords <- plan3_flats %>%
+  filter(!is.na(flat)) %>%
+  group_by(flat) %>%
+  summarize(
+    xmin=min(x_pos)-radius,
+    xmax=max(x_pos)+radius,
+    ymin=min(y_pos)-radius,
+    ymax=max(y_pos)+radius
+  )
+
+field.flat.plot <- flat_coords %>%
+  ggplot(aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=as.factor(flat %% 12))) +
+  geom_rect() +
+  scale_fill_brewer(palette = "Paired", guide="none") +
+  geom_label(aes(x=xmin, y=ymin, label=flat), nudge_x = 150, nudge_y = -100, fill="grey90") +
+  coord_equal() +
+  scale_y_reverse()
+
+field.flat.plot +  
+  geom_circle(data = plan3_flats, aes(x0=x_pos, y0=y_pos, r=radius), fill="lightgreen", color="grey50", alpha=.25, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (cm)") + ylab("position (cm)") 
+
+ ggsave("../output/FieldPlan_with_flats.jpeg", width = 10, height = 6)
 ```
 
