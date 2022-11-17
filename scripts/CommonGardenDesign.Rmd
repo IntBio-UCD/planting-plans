@@ -172,6 +172,33 @@ plan3 %>% #filter(block=="A", row <6) %>%
 
 # ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
+Output spacing for Black A to use as guide for cuting holes
+```{r, fig.width=8, fig.height=10.5}
+
+x_labels <- plan3 %>% filter(block=="A") %>% pull(x_pos) %>% round(1) %>% unique()
+
+plan3 %>% filter(block=="A") %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
+  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+  geom_text(aes(x=x_pos, y=y_pos), size=3) +
+  scale_x_continuous(breaks = x_labels) +
+  coord_equal(ylim = c(20,660)) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+  xlab("position (cm)") + ylab("position (cm)") 
+ggsave("../output/spacing_guide_1.pdf", width = 8, height = 10.5)
+
+plan3 %>% filter(block=="A") %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
+  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+  geom_text(aes(x=x_pos, y=y_pos), size=3) +
+  scale_x_continuous(breaks = x_labels) +
+  coord_equal(ylim = c(700,1320)) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+  xlab("position (cm)") + ylab("position (cm)") 
+ggsave("../output/spacing_guide_2.pdf", width = 8, height = 10.5)
+```
 
 
 Alternate, what if we stack blocks (NOT UPDATED)
