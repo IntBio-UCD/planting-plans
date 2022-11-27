@@ -475,7 +475,7 @@ plan3_plants <- plan3 %>%
   filter(!is.na(block))
 
 
-pdf("../output/bedmaps.pdf",width = 8.5, height = 11)
+pdf("../output/UCD2022_planting_maps.pdf",width = 8.5, height = 11)
 
 for(b in unique(plan3_plants$block)) {
   germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
@@ -493,7 +493,7 @@ for(b in unique(plan3_plants$block)) {
 
 dev.off()
 
-pdf("../output/bedmaps2.pdf",width = 8.5, height = 11)
+pdf("../output/UCD2022_randomization_maps.pdf",width = 8.5, height = 11)
 
 for(b in unique(plan3_plants$block)) {
   germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
