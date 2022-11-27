@@ -410,9 +410,12 @@ germinated  %>% arrange(parent.pop, mf) # confirm different positions per block
 Fill in the blanks...
 ```{r}
 germinated <- germinated %>% ungroup() %>%
-  expand(block, row=1:(max(germinated$row)+2), column) %>% 
-  left_join(plants) %>%
-  mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop))
+  expand(bed, row=1:(max(germinated$row)+2), column) %>% 
+  left_join(germinated) %>%
+  mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop),
+         block=ifelse(!is.na(block), block, 
+                      ifelse(row < 3, str_c(bed,"1"), str_c(bed, "2"))))
+
 germinated
 ```
 
@@ -448,13 +451,12 @@ plants %>% arrange(parent.pop, mf, rep) %>%
 
 ## combine bed map and field map
 
-Plot with flats super-imposed
 ```{r, fig.width=12}
 
 plan3_plants <- plan3 %>%
   mutate(column=LETTERS[column]) %>%
   full_join(plants) %>%
-  mutate(label=ifelse(parent.pop=="buffer", parent.pop, str_c(parent.pop, "\n", mf, "-", rep) )) %>%
+  mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
   filter(!is.na(block))
 
 
@@ -471,6 +473,24 @@ for(b in unique(plan3_plants$block)) {
   xlab("position (cm)") + ylab("position (cm)") +
     ggtitle(str_c("Block ", b, germlabel))
     print(pl)
+}
+
+dev.off()
+
+pdf("../output/bedmaps2.pdf",width = 8.5, height = 11)
+
+for(b in unique(plan3_plants$block)) {
+  germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
+  pl <- plan3_plants %>% filter(block==b) %>%
+    ggplot(aes(x0=column, y0=row, label=label, r=.5)) +
+  #  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+    geom_label(aes(x=column, y=row), size=3.5, lineheight=.8) +
+    coord_equal() + 
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    ggtitle(str_c("Block ", b, germlabel)) +
+    scale_y_continuous(breaks = 1:44) 
+    #scale_x_continuous( labels=c("A","B","C","D"))
+  print(pl)
 }
 
 dev.off()
