@@ -46,11 +46,11 @@ seed.combined <- bind_rows(seed, extra)
 germinated <- seed.combined %>%
   filter(`germinated?`==1)
 
-not.germinated <- seed.combined %>%
+notgerminated <- seed.combined %>%
   filter(`germinated?` == 0)
 ```
 
-## assign blocks
+## assign blocks to germinated
 
 Can plant 160  plants per bed
 ```{r}
@@ -80,8 +80,10 @@ A bit challenging because for pops with few reps total we should be careful to d
 I think one way this can work is to arrange by pops and mfs and then assign a randomized set of block labels to it.
 
 ```{r}
-germbeds <- c("C", "E", "G", "I", "K")
-notgermbeds <- LETTERS[1:13] %>% setdiff(germbeds)
+# Remember, Bed A is buffer
+
+germbeds <- c("D", "F", "H", "J", "L")
+notgermbeds <- LETTERS[2:14] %>% setdiff(germbeds)
 
 germblocks <- str_c(rep(germbeds,2), c("1", "2")) %>% sort
 
@@ -150,74 +152,133 @@ germinated %>%
   group_by(block) %>%
   summarise(n=n())
 ```
+## assign blocks to nongerminated
 
+We aren't using buffer rows, so can plant 176  plants per bed
+```{r}
+nrow(notgerminated) 
+nrow(notgerminated) / 176
+nrow(notgerminated) %% 176
 
-## filter to one entry per pop, etc
+```
+
+So, use 8 beds.  Six seeds won't make it into this design.
+
+get a histogram of rep count
 
 ```{r}
-pops.filtered <- pops %>% group_by(parent.pop) %>% slice_max(order_by=maternal.families) %>%
-  filter(approx.number.seeds >= 100) %>%
-  filter(!(parent.pop %in% c("HH", "RB"))) # old seed
-
-pops.filtered %>% arrange(maternal.families)
+notgerminated %>%
+  group_by(parent.pop, mf) %>%
+  summarize(n=n()) %>%
+  ggplot(aes(x=n)) +
+  geom_histogram(binwidth = 1)
 ```
 
 ```{r}
-sum(pops.filtered$maternal.families>=8)
+notgerminated %>%
+  group_by(parent.pop) %>%
+  summarize(n=n()) %>%
+  arrange(n)
 ```
+
+remove the six seed from mfs with 13 reps
+```{r}
+remove <- notgerminated %>%
+  group_by(parent.pop, mf) %>%
+  mutate(reps=n()) %>%
+  ungroup() %>%
+  filter(reps==13, rep==13) %>% # use pops that have the highest number mfs in this category
+  group_by(parent.pop) %>%
+  mutate(mfs=n()) %>%
+  arrange(desc(mfs)) %>%
+  filter(row_number(mf)==sample(row_number(mf), size = 1)) %>% # pick a random mf for each pop
+  ungroup() %>%
+  slice_max(mfs, n=6, with_ties = FALSE) %>% # 6 pops with largest number of mfs with 13 non germinated
+select(-reps, -mfs)
+
+notgerminated <- notgerminated %>% anti_join(remove)
+
+dim(notgerminated)
+```
+
 
 ```{r}
-sum(pops.filtered$maternal.families>=15)
+set.seed(777)
+notgermblocks <- str_c(rep(notgermbeds,each=2), c("1", "2")) %>% sample
+
+notgermreps <- ceiling(nrow(notgerminated) / length(notgermblocks) ) # number of times we have to assign blocks
+
+# I'm going to be a little more simplistic about the randomization for the non germinated since we can't cope with unequal block size
+
+notgerminated$block <- rep(notgermblocks, length.out=nrow(notgerminated))
+#for low rep mfs, randomize the whole pop
+set.seed(777)
+notgerminated_lowrep <- notgerminated %>%
+  group_by(parent.pop, mf) %>%
+  mutate(reps=n()) %>%
+  filter(reps < 8) %>%
+  group_by(parent.pop) %>%
+  mutate(block= sample(block),
+         bed=str_sub(block, 1,1)) %>%
+  ungroup() 
+
+#For high rep mfs, just use the sequentially assigned blocks
+notgerminated_highrep <- notgerminated %>%
+  group_by(parent.pop, mf) %>%
+  mutate(reps=n()) %>%
+  filter(reps >= 8) %>%
+  ungroup %>%
+  mutate(bed=str_sub(block, 1,1))
+
+notgerminated <- bind_rows(notgerminated_lowrep, notgerminated_highrep) %>% arrange(parent.pop, mf)  
+
+notgerminated  
 ```
-
-### Scenario 1:
-
-Plant 21 pops * 8 families * 12 reps (= 2016 plants)
-
-### Scenario 2:
-
-Plant 11 pops * 15 families * 12 reps (= 1980 plants)
-
-### Scenario 3:
-
-__Note: after calculating above, Sarah found more mfs from WV, so:_
-
-3 mfs from WR and 7 mfs from everyone else
-
-total mfs = 3+7*22 = 157 * 13 reps (= 2041 plants)
-
-## Which pops?
-
-The group decision was to go with scenario 3: "3 mfs from WV, 4 mfs WR and 7 mfs from everyone else"
-
-This is the full (filtered) data sheet.
-
+reality check distribution across mfs
 ```{r}
-pops.filtered %>% arrange(parent.pop) %>% write_csv("../output/Pops_for_2022_UCD.csv")
+notgerminated %>%
+  mutate(notgerminated=1) %>%
+  pivot_wider(id_cols = c(parent.pop, mf), names_from = block, values_from = notgerminated, values_fill = 0, values_fn = sum) %>%
+  relocate(sort(notgermblocks), .after=mf)
 ```
+
+reality check distribution across parent.pops
+```{r}
+notgerminated %>%
+    mutate(notgerminated=1) %>%
+  pivot_wider(id_cols = parent.pop, names_from = block, values_from = notgerminated, values_fill = 0, values_fn = sum) %>%
+    relocate(sort(notgermblocks), .after=parent.pop)
+```
+
+plants per block:
+```{r}
+notgerminated %>%
+  group_by(block) %>%
+  summarise(n=n())
+```
+plants per bed
+```{r}
+notgerminated %>%
+  group_by(bed) %>%
+  summarise(n=n())
+```
+
+Looks good
 
 ## planting grid
 
-### go with plan 3
-
-### Example plot for "60 in veg crop" bed.
-
-Sarah says this is 100 cm of plantable width.  
-
-2041 plants.  1 block per rep, so 13 blocks each of 157 plants
-
-157/4 = 39.25 with 4 columns this is 39.25 plants per column per block.  Call it 40.  But then two more buffers on each side, call it 44
+60 inch veg crops bed is 100 cm of plantable width.  
 
 Create grid
 ```{r}
 stagger <- TRUE
-buffer.blocks <- 2
-buffer.rows <- 2 # on each edge of each block
-exp.blocks <- 13
-blocks <- LETTERS[1:(buffer.blocks+exp.blocks)]
-columns <- 4 # per block
+buffer.beds <- 2
+buffer.rows <- 2 # on each edge of each bed
+exp.beds <- 13
+beds <- LETTERS[1:(buffer.beds+exp.beds)]
+columns <- 4 # per bed
 rows <- 44 # four of which are buffers
-plants <- length(blocks) * columns * rows
+plants <- length(beds) * columns * rows
 bedwidth <- 100 # cm
 furrow <- 52 #cm
 size <- 30 # plant diameter
@@ -225,14 +286,14 @@ radius <- size/2
 blankevery <- 2 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
 expandfactor <- blankevery/(blankevery-1)
 
-plan3 <- expand_grid(block=blocks,
+plan3 <- expand_grid(bed=beds,
                      column=1:columns,
                      row=1:rows,
                      radius=radius)
 
 plan3 <- plan3 %>%
-  mutate(plantedcol=(match(block, LETTERS)-1)*4 + column,
-         bedcol = floor((match(block, LETTERS)-1)*expandfactor + 1   )) 
+  mutate(plantedcol=(match(bed, LETTERS)-1)*4 + column,
+         bedcol = floor((match(bed, LETTERS)-1)*expandfactor + 1   )) 
 
 plan3
 ```
@@ -257,19 +318,19 @@ if (stagger) {
 plan3
 ```
 Plot it
-```{r, fig.width=12}
+```{r, fig.width=12, eval=FALSE}
 
-#create block labels
-# block.labels <- plan3 %>%
-#   group_by(block) %>%
-#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
+#create bed labels
+# bed.labels <- plan3 %>%
+#   group_by(bed) %>%
+#   summarize(x_pos = mean(x_pos+bed_x_offset), y_pos=max(y_pos*1.075)) 
 
 
-plan3 %>% #filter(block=="A", row <6) %>%
+plan3 %>% #filter(bed=="A", row <6) %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal() + 
-  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (cm)") + ylab("position (cm)")
 
@@ -277,224 +338,142 @@ ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
 
 Plot it in feet
-```{r, fig.width=12}
+```{r, fig.width=12, eval=FALSE}
 
-#create block labels
-# block.labels <- plan3 %>%
-#   group_by(block) %>%
-#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(y_pos*1.075)) 
+#create bed labels
+# bed.labels <- plan3 %>%
+#   group_by(bed) %>%
+#   summarize(x_pos = mean(x_pos+bed_x_offset), y_pos=max(y_pos*1.075)) 
 
 
-plan3 %>% #filter(block=="A", row <6) %>%
+plan3 %>% #filter(bed=="A", row <6) %>%
   mutate(across(.cols=c(x_pos, y_pos, radius), ~ .x*0.0328084)) %>% # convert cm to feet
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
   geom_circle(fill="lightgreen", alpha=.25) + 
   coord_equal(xlim = c(4,145)) + 
-  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
   xlab("position (feet)") + ylab("position (feet)") 
 
 # ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
 ```
+
 Output spacing for Black A to use as guide for cuting holes
-```{r, fig.width=8, fig.height=10.5}
+```{r, fig.width=8, fig.height=10.5, eval=FALSE}
 
-x_labels <- plan3 %>% filter(block=="A") %>% pull(x_pos) %>% round(1) %>% unique()
+x_labels <- plan3 %>% filter(bed=="A") %>% pull(x_pos) %>% round(1) %>% unique()
 
-plan3 %>% filter(block=="A") %>%
+plan3 %>% filter(bed=="A") %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
   geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
   geom_text(aes(x=x_pos, y=y_pos), size=3) +
   scale_x_continuous(breaks = x_labels) +
   coord_equal(ylim = c(20,660)) + 
-  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
   theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
   xlab("position (cm)") + ylab("position (cm)") 
 ggsave("../output/spacing_guide_1.pdf", width = 8, height = 10.5)
 
-plan3 %>% filter(block=="A") %>%
+plan3 %>% filter(bed=="A") %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
   geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
   geom_text(aes(x=x_pos, y=y_pos), size=3) +
   scale_x_continuous(breaks = x_labels) +
   coord_equal(ylim = c(700,1320)) + 
-  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
   theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
   xlab("position (cm)") + ylab("position (cm)") 
 ggsave("../output/spacing_guide_2.pdf", width = 8, height = 10.5)
 ```
 
 
-Alternate, what if we stack blocks (NOT UPDATED)
-
-```{r, fig.width=12}
-# # only offset x_positions (1 "row" of blocks)
-# plan3 <- plan3 %>%
-#   mutate(block_x_offset = as.integer(as.factor(block)) %% 7 -1,
-#          block_x_offset = block_x_offset* (aisle + size + (columns-1)*column_offset)) %>%
-#   mutate(block_y_offset = (as.integer(as.factor(block)) %/% 7)*-1+1 ,
-#          block_y_offset = block_y_offset*size*rows+block_y_offset*aisle*1.5)
-# 
-# #create block labels
-# block.labels <- plan3 %>%
-#   group_by(block) %>%
-#   summarize(x_pos = mean(x_pos+block_x_offset), y_pos=max(block_y_offset + y_pos*1.075))
-# 
-# 
-# plan3 %>% #filter(block=="A", row <6) %>%
-#   ggplot(aes(x0=x_pos+block_x_offset, y0=y_pos+block_y_offset, r=radius)) +
-#   geom_circle(fill="lightgreen", alpha=.25) + 
-#   coord_equal() + 
-#   geom_text(aes(x=x_pos, y=y_pos, label=block), size= 20, data = block.labels, inherit.aes = FALSE) + 
-#   theme(axis.text = element_text(size=16), axis.title = element_text(size=16)) +
-#   xlab("position (cm)") + ylab("position (cm)")
-```
 ## Assign Plants
-```{r}
-plants  <- read_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
-                      sheet="label making")
 
-plants 
-```
-set up row labels for sampling 
-```{r}
-# because we have two buffer rows at the beginning and end, we start at row 3 and go to rows -2
-rows.sample <- rep(3:(rows-2), times=c(rep(columns,rows-5), 1) ) 
-
-#cols.sample <- rep(LETTERS[1:columns], times=c(rows, rep(rows-1, columns-1)))
-```
-
-Add block (easy because block ~= rep, but I am using letters for block and need to adjust for the buffer rows)
-```{r}
-plants <- plants %>% mutate(block=LETTERS[rep+(buffer.blocks/2)])
-```
-now add row and column positions:
+### germinated
 
 ```{r}
-set.seed(092222) # so we get the same "randomization" each time we run this
-plants <- plants %>%
+set.seed(999)
+germinated <- germinated %>% 
+  group_by(bed) %>%
+  arrange(block) %>%
+  mutate(row=rep(3:(2+ceiling(n()/columns)), each=columns, length.out=n())) %>% 
   group_by(block) %>%
-  mutate(row=sample(rows.sample)) %>%
-  group_by(block, row) %>%
-  mutate(column=sample(LETTERS[1:columns], size=n()))
+  mutate(row=sample(row)) %>%
+  group_by(bed, row) %>%
+  mutate(column=sample(LETTERS[1:columns], size=n())) #%>%
+  #select(-reps)
 
-plants %>% arrange(parent.pop, mf) # confirm different positions per block
+germinated  %>% arrange(block, row) 
+
+germinated  %>% arrange(parent.pop, mf) # confirm different positions per block
 ```
 Fill in the blanks...
 ```{r}
-plants <- plants %>% ungroup() %>%
-  expand(block, row=1:rows, column) %>% 
+germinated <- germinated %>% ungroup() %>%
+  expand(block, row=1:(max(germinated$row)+2), column) %>% 
   left_join(plants) %>%
   mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop))
-plants
+germinated
 ```
 
 
-now add flat info for the growth chamber.  flats are 7 X 14.  We don't have space to do 4 rows per flat, so we will do 7 rows per flat and spread them out day of planting
-
-We have a total of 13 * 4 = 52 columns.  8 flats have a total of 56 columns.
-
-```{r, eval=TRUE}
-plants <- plants %>% ungroup() %>%
-  mutate(ubercolumn = as.integer(factor(str_c(block, column))),
-         flat = ifelse(row <= rows - buffer.rows, ((row - 1 ) %/% 14) + 1, NA), # row assignment for lat
-         flat = flat + ((ubercolumn - 1) %/% 7) * 3,  # column assignments to flat (7 columns per flat)
-         flat_row = ((row-1) %% 14) + 1,
-         flat_column = LETTERS[((ubercolumn-1) %% 7) + 1])
-plants
-
-tail(plants)
-```
-
-Not using.  Can use if we want flats to run the other way in the field.
-```{r, eval=FALSE}
-plants <- plants %>% ungroup() %>%
-  mutate(ubercolumn = as.integer(factor(str_c(block, column))),
-         flat = (ubercolumn + 6) %/% 7, # column assignments to flat (7 columns per flat)
-         flat = flat + ((row-1) %/% 14)*8, # adjust for row (14 rows per flat, 8 flats per row of flats)
-         flat_row = ((row-1) %% 14) + 1,
-         flat_column = LETTERS[((ubercolumn-1) %% 7) + 1)]
-
-plants
-
-tail(plants)
-```
-
-
-plot flatmaps
-```{r, fig.height=10, fig.width=7.5}
-
-flat.plots <- map(unique(plants$flat), function(f) {
-  
-  plants.flat <- plants %>% filter(flat==f) %>%
-    mutate(label=ifelse(is.na(mf),
-                        str_c(parent.pop, "\n", block, "-", row, column),
-                        str_c(parent.pop, "-", mf, "-r", rep, "\n", block, "-", row, column)))
-  
-  row.labels <- plants.flat %>% pull(row) %>% unique() %>% sort()
-  col.labels <- plants.flat %>% pull(ubercolumn) %>% unique() %>% sort()
-  
-  plants.flat %>%  ggplot(aes(x=ubercolumn, y=row, x0=ubercolumn, y0 = row, label=label)) +
-    geom_tile(fill="white", color="black") +
-    coord_equal(expand = FALSE) +
-    geom_text(size=3) +
-    scale_y_reverse(labels=row.labels, breaks=row.labels) +
-    scale_x_continuous(labels=col.labels, breaks=col.labels) +
-    ggtitle(str_c("Flat ", f)) 
-}
-)
-```
-
-```{r, fig.height=10, fig.width=7.5}
-flat.plots[[1]]
-```
+### assign positions for not germinated
 
 ```{r}
-pdf(file="../output/flatmaps.pdf", width=7.5, height = 10)
-walk(flat.plots, print)
-dev.off()
+set.seed(999)
+notgerminated <- notgerminated %>% 
+  group_by(bed) %>%
+  arrange(block) %>%
+  mutate(row=rep(1:rows, each=columns, length.out=n())) %>% 
+  group_by(block) %>%
+  mutate(row=sample(row)) %>%
+  group_by(bed, row) %>%
+  mutate(column=sample(LETTERS[1:columns], size=n())) %>%
+  select(-reps)
+
+notgerminated  %>% arrange(block, row) 
+```
+combine it
+```{r}
+plants <- bind_rows(germinated, notgerminated)
 ```
 
+
+Write it out
 ```{r}
 plants %>% arrange(parent.pop, mf, rep) %>%
-  select(parent.pop, mf, rep, flat, flat_row, flat_column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
-                                                        sheet="Flat and Block map")
+  select(parent.pop, mf, rep, bed, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+                                                        sheet="New Bed Map")
 ```
 
-## combine flat map and field map
+## combine bed map and field map
 
 Plot with flats super-imposed
 ```{r, fig.width=12}
 
-plan3_flats <- plan3 %>%
+plan3_plants <- plan3 %>%
   mutate(column=LETTERS[column]) %>%
-  full_join(plants)
+  full_join(plants) %>%
+  mutate(label=ifelse(parent.pop=="buffer", parent.pop, str_c(parent.pop, "\n", mf, "-", rep) )) %>%
+  filter(!is.na(block))
 
 
-flat_coords <- plan3_flats %>%
-  filter(!is.na(flat)) %>%
-  group_by(flat) %>%
-  summarize(
-    xmin=min(x_pos)-radius,
-    xmax=max(x_pos)+radius,
-    ymin=min(y_pos)-radius,
-    ymax=max(y_pos)+radius
-  )
+pdf("../output/bedmaps.pdf",width = 8.5, height = 11)
 
-field.flat.plot <- flat_coords %>%
-  ggplot(aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=as.factor(flat %% 12))) +
-  geom_rect() +
-  scale_fill_brewer(palette = "Paired", guide="none") +
-  geom_label(aes(x=xmin, y=ymin, label=flat), nudge_x = 150, nudge_y = -100, fill="grey90") +
-  coord_equal() +
-  scale_y_reverse()
+for(b in unique(plan3_plants$block)) {
+  germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
+  pl <- plan3_plants %>% filter(block==b) %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
+  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+  geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
+  coord_equal() + 
+  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+  xlab("position (cm)") + ylab("position (cm)") +
+    ggtitle(str_c("Block ", b, germlabel))
+    print(pl)
+}
 
-field.flat.plot +  
-  geom_circle(data = plan3_flats, aes(x0=x_pos, y0=y_pos, r=radius), fill="lightgreen", color="grey50", alpha=.25, inherit.aes = FALSE) + 
-  #  geom_text(aes(x=x_pos, y=y_pos, label=block), size= 14, data = block.labels, inherit.aes = FALSE) + 
-  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
-  xlab("position (cm)") + ylab("position (cm)") 
+dev.off()
 
- ggsave("../output/FieldPlan_with_flats.jpeg", width = 10, height = 6)
 ```
 
