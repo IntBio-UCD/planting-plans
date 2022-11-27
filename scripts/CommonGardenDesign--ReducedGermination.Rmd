@@ -400,8 +400,8 @@ germinated <- germinated %>%
   group_by(block) %>%
   mutate(row=sample(row)) %>%
   group_by(bed, row) %>%
-  mutate(column=sample(LETTERS[1:columns], size=n())) #%>%
-  #select(-reps)
+  mutate(column=sample(LETTERS[1:columns], size=n())) %>%
+  select(-reps)
 
 germinated  %>% arrange(block, row) 
 
@@ -409,12 +409,26 @@ germinated  %>% arrange(parent.pop, mf) # confirm different positions per block
 ```
 Fill in the blanks...
 ```{r}
-germinated <- germinated %>% ungroup() %>%
-  expand(bed, row=1:(max(germinated$row)+2), column) %>% 
+germ.fill <- germinated %>% 
+  filter(str_detect(block, "1")) %>%
+  group_by(block) %>%
+  expand(row=1:max(row), column) %>%
+  mutate(bed=str_sub(block, 1,1))
+
+germ.fill <- germinated %>%
+  filter(str_detect(block, "2")) %>%
+  group_by(block) %>%
+  expand(row=min(row):(max(row)+2), column) %>%
+  bind_rows(germ.fill) %>%
+  mutate(bed=str_sub(block, 1,1))
+
+germinated <- germ.fill %>%
   left_join(germinated) %>%
-  mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop),
-         block=ifelse(!is.na(block), block, 
-                      ifelse(row < 3, str_c(bed,"1"), str_c(bed, "2"))))
+  mutate(parent.pop=ifelse(is.na(parent.pop), "buffer", parent.pop))
+         
+         # ,
+         # block=ifelse(!is.na(block), block, 
+         #              ifelse(row < 3, str_c(bed,"1"), str_c(bed, "2"))))
 
 germinated
 ```
@@ -445,7 +459,7 @@ plants <- bind_rows(germinated, notgerminated)
 Write it out
 ```{r}
 plants %>% arrange(parent.pop, mf, rep) %>%
-  select(parent.pop, mf, rep, bed, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+  select(parent.pop, mf, rep, bed, block, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
                                                         sheet="New Bed Map")
 ```
 
@@ -457,6 +471,7 @@ plan3_plants <- plan3 %>%
   mutate(column=LETTERS[column]) %>%
   full_join(plants) %>%
   mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
+  mutate(label=ifelse(is.na(label), "buff", label)) %>%
   filter(!is.na(block))
 
 
@@ -465,14 +480,15 @@ pdf("../output/bedmaps.pdf",width = 8.5, height = 11)
 for(b in unique(plan3_plants$block)) {
   germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
   pl <- plan3_plants %>% filter(block==b) %>%
-  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
-  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
-  geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
-  coord_equal() + 
-  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
-  xlab("position (cm)") + ylab("position (cm)") +
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
+    geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+    geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
+    coord_equal() + 
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() + 
     ggtitle(str_c("Block ", b, germlabel))
-    print(pl)
+  print(pl)
 }
 
 dev.off()
@@ -482,14 +498,12 @@ pdf("../output/bedmaps2.pdf",width = 8.5, height = 11)
 for(b in unique(plan3_plants$block)) {
   germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
   pl <- plan3_plants %>% filter(block==b) %>%
-    ggplot(aes(x0=column, y0=row, label=label, r=.5)) +
-  #  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+    ggplot(aes(x0=column, y0=row, label=label)) +
     geom_label(aes(x=column, y=row), size=3.5, lineheight=.8) +
     coord_equal() + 
     theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
-    ggtitle(str_c("Block ", b, germlabel)) +
-    scale_y_continuous(breaks = 1:44) 
-    #scale_x_continuous( labels=c("A","B","C","D"))
+    scale_y_reverse(breaks = 1:44) +
+    ggtitle(str_c("Block ", b, germlabel))
   print(pl)
 }
 
