@@ -396,8 +396,9 @@ set.seed(999)
 germinated <- germinated %>% 
   group_by(bed) %>%
   arrange(block) %>%
-  mutate(row=rep(3:(2+ceiling(n()/columns)), each=columns, length.out=n())) %>% 
+  mutate(row=rep(3:(2+ceiling(n()/columns)), each=columns, length.out=n())) %>%
   group_by(block) %>%
+  mutate(row=ifelse(str_sub(block,2,2) == "2" & (length(row[row==min(row)]) < columns), row+1, row)) %>%
   mutate(row=sample(row)) %>%
   group_by(bed, row) %>%
   mutate(column=sample(LETTERS[1:columns], size=n())) %>%
