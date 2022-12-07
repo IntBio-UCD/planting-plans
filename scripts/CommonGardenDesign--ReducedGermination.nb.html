@@ -2518,13 +2518,56 @@ notgerminated  %&gt;% arrange(block, row) </code></pre>
 <h3>Correct positions for field mistakes / swaps</h3>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbImdyb3VwZWRfZGYiLCJ0YmxfZGYiLCJ0YmwiLCJkYXRhLmZyYW1lIl0sIm5yb3ciOjEwLCJuY29sIjo4LCJzdW1tYXJ5Ijp7IkEgdGliYmxlIjpbIjEwIMOXIDgiXSwiR3JvdXBzIjpbImJsb2NrIFs0XSJdfX0sInJkZiI6Ikg0c0lBQUFBQUFBQUE2MVVNVS9DUUJTK3RsUkxEVWlpZzRPRE1RNHVOQkZOWkFPc1lVRkNSRFF3SHUyQkRlMjFLU1U2OHBPZEhLbFhlcTlDSzlyQlM2N2ZkOTk3ZlhmdnZWNzc5OE5yZGFnaWhDUlVFQVVreVl3aStYblFydFlSVTloQ1FBVlVqUENkT1IweG9yQlpZVlBsQmxHLytvSFZzcXliazNVMkdVTGxhSzhtaWtkVDRkaGN4dGlDTmNmR2pyWE8vWFVFWXpNSDRXNDNhV1ZJMXBSVjlQUU9lZzdTelVFNjN5VFZoM2FmTTJuVXF3TWRKSFZsNmkzUWh4Zm9sUFQwV011dGpubzNTVU9PZVdHaE1hY2NLekUyUG43SHhGOUpHcktPbTlqUE9KNXpoUDFPL3NBTGpwZmJjZEcvajYzYklSczJuczlSM0JFUVZSTUhXSnY0MkNFcDk2THZ2bW1VNmRFckpUYkZKWHVFWWZpWmpndE9VVndGeExIdEdqTm9DZ3ZGNlo3aDJndUhnbUZNVERpSWgzMUNBODF6UGZoWW5FbnlQZ0h4WUVwOHg2STRJR1owYlZhcHMreTdYbUM1bEoxR2pQNERjaXBid1U4Smh3c2FuZDZzR3E4TE9xdldlQnNFWHI4UzUrb0dWK0l0Q3lFUEpVTm1oRTR0U2lCL0c0K0p6UmRsbHYrNlNKcm5XelNBakprNjF3STN3T0Nuc3VLQXNzNE5yYjRBazNNaTh2NEVBQUE9In0= -->
-<div data-pagedtable="false">
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["block"],"name":[1],"type":["chr"],"align":["left"]},{"label":["row"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["column"],"name":[3],"type":["chr"],"align":["left"]},{"label":["bed"],"name":[4],"type":["chr"],"align":["left"]},{"label":["parent.pop"],"name":[5],"type":["chr"],"align":["left"]},{"label":["mf"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["rep"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["germinated?"],"name":[8],"type":["dbl"],"align":["right"]}],"data":[{"1":"C1","2":"2","3":"B","4":"C","5":"FR","6":"5","7":"1","8":"0"},{"1":"C1","2":"3","3":"B","4":"C","5":"YO8","6":"2","7":"8","8":"0"},{"1":"C2","2":"33","3":"B","4":"C","5":"TM2","6":"7","7":"9","8":"0"},{"1":"C2","2":"34","3":"A","4":"C","5":"YO7","6":"4","7":"5","8":"0"},{"1":"M2","2":"32","3":"A","4":"M","5":"LV1","6":"1","7":"6","8":"0"},{"1":"M2","2":"31","3":"B","4":"M","5":"SQ2","6":"1","7":"6","8":"0"},{"1":"M2","2":"32","3":"A","4":"M","5":"LV1","6":"1","7":"6","8":"0"},{"1":"M2","2":"31","3":"B","4":"M","5":"SQ2","6":"1","7":"6","8":"0"},{"1":"K2","2":"39","3":"A","4":"K","5":"LV1","6":"7","7":"10","8":"0"},{"1":"K2","2":"38","3":"C","4":"K","5":"YO4","6":"3","7":"12","8":"0"}],"options":{"columns":{"min":{},"max":[10],"total":[8]},"rows":{"min":[10],"max":[10],"total":[10]},"pages":{}}}
-  </script>
-</div>
-<!-- rnb-frame-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBGaXggcmVwbGFjZW1lbnQgbWFkZSBpbiBzY3JlZW5ob3VzZTpcbmNvcjEgPC0gcGxhbnRzICU+JSBmaWx0ZXIocGFyZW50LnBvcD09XCJZTzhcIiAmIG1mPT03ICYgcmVwPT0xMikgJT4lXG4gIG11dGF0ZShwYXJlbnQucG9wPVwiU1EzXCIsIG1mPTIsIHJlcD0xNClcblxuY29ycmVjdGVkIDwtIHBsYW50cyAlPiVcbiAgcm93c191cGRhdGUoY29yMSwgYnk9YyhcImJsb2NrXCIsIFwicm93XCIsIFwiY29sdW1uXCIpKVxuXG4jIEZpeCBzd2FwcyBtYWRlIHdoaWxlIHBsYW50aW5nXG5cbmNvcjIgPC0gcGxhbnRzICU+JSBmaWx0ZXIoKHBhcmVudC5wb3A9PVwiWU84XCIgJiBtZj09MiAmIHJlcD09OCkgfCggcGFyZW50LnBvcD09XCJGUlwiICYgbWY9PTUgJiByZXA9PTEpKSAlPiVcbiAgbXV0YXRlKHJvdz1yZXYocm93KSlcblxuY29yMyA8LSBwbGFudHMgJT4lIGZpbHRlcigocGFyZW50LnBvcD09XCJZTzdcIiAmIG1mPT00ICYgcmVwPT01KSB8IChwYXJlbnQucG9wPT1cIlRNMlwiICYgbWY9PTcgJiByZXA9PTkpKSAlPiVcbiAgbXV0YXRlKHJvdz1yZXYocm93KSwgY29sdW1uPXJldihjb2x1bW4pKVxuXG5jb3I0IDwtIHBsYW50cyAlPiUgZmlsdGVyKChwYXJlbnQucG9wPT1cIlNRMlwiICYgbWY9PTEgJiByZXA9PTYpIHwgKHBhcmVudC5wb3A9PVwiTFYxXCIgJiBtZj09MSAmIHJlcD09NikpICU+JVxuICBtdXRhdGUocm93PXJldihyb3cpLCBjb2x1bW49cmV2KGNvbHVtbikpXG5cbmNvcjUgPC0gcGxhbnRzICU+JSBmaWx0ZXIoKHBhcmVudC5wb3A9PVwiWU80XCIgJiBtZj09MyAmIHJlcD09MTIpIHwgKHBhcmVudC5wb3A9PVwiTFYxXCIgJiBtZj09NyAmIHJlcD09MTApKSAlPiVcbiAgbXV0YXRlKHJvdz1yZXYocm93KSwgY29sdW1uPXJldihjb2x1bW4pKVxuXG5jb3JyZWN0ZWQgPC0gY29ycmVjdGVkICU+JVxuICByb3dzX3VwZGF0ZShiaW5kX3Jvd3MoY29yMiwgY29yMywgY29yNCwgY29yNSksIGJ5PWMoXCJwYXJlbnQucG9wXCIsIFwibWZcIiwgXCJyZXBcIikpXG5cbiMgRml4IEJlZCBLIGJsb2NrIHN3YXBzXG5cbmNvcjYgPC0gcGxhbnRzICU+JSBmaWx0ZXIoYmxvY2s9PVwiSzJcIiAmIHJvdyA+IDIyICYgcm93IDwgMzcpICU+JVxuICBtdXRhdGUoYmxvY2s9XCJLMVwiLCByb3c9cm93LTIyKVxuXG5jb3I3IDwtIHBsYW50cyAlPiUgZmlsdGVyKGJsb2NrPT1cIksxXCIgJiByb3cgPCAxNSkgJT4lXG4gIG11dGF0ZShibG9jaz1cIksyXCIsIHJvdz1yb3crMjIpXG5cbmNvcnJlY3RlZCA8LSBjb3JyZWN0ZWQgJT4lXG4gIHJvd3NfdXBkYXRlKGJpbmRfcm93cyhjb3I2LGNvcjcpLCBieT1jKFwicGFyZW50LnBvcFwiLCBcIm1mXCIsIFwicmVwXCIpKVxuXG5wbGFudHMgPC0gY29ycmVjdGVkXG5cbnBsYW50cyAlPiUgYXJyYW5nZShwYXJlbnQucG9wLCBtZiwgcmVwKSAlPiVcbiAgc2VsZWN0KHBhcmVudC5wb3AsIG1mLCByZXAsIGJlZCwgYmxvY2ssIHJvdywgY29sdW1uLCBldmVyeXRoaW5nKCkgKSAlPiUgd3JpdGVfc2hlZXQoXCJodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9zcHJlYWRzaGVldHMvZC8xRWFTQTJRcmxXQWpGUjM1cGVkY3ZoZVFwM1g3QWdzbGE2cFp0RTJDMVFKNFwiLFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzaGVldD1cIkNvcnJlY3RlZCBCZWQgTWFwIDIwMjItMTItMDZcIilcbmBgYCJ9 -->
+<pre class="r"><code># Fix replacement made in screenhouse:
+cor1 &lt;- plants %&gt;% filter(parent.pop==&quot;YO8&quot; &amp; mf==7 &amp; rep==12) %&gt;%
+  mutate(parent.pop=&quot;SQ3&quot;, mf=2, rep=14)
+
+corrected &lt;- plants %&gt;%
+  rows_update(cor1, by=c(&quot;block&quot;, &quot;row&quot;, &quot;column&quot;))
+
+# Fix swaps made while planting
+
+cor2 &lt;- plants %&gt;% filter((parent.pop==&quot;YO8&quot; &amp; mf==2 &amp; rep==8) |( parent.pop==&quot;FR&quot; &amp; mf==5 &amp; rep==1)) %&gt;%
+  mutate(row=rev(row))
+
+cor3 &lt;- plants %&gt;% filter((parent.pop==&quot;YO7&quot; &amp; mf==4 &amp; rep==5) | (parent.pop==&quot;TM2&quot; &amp; mf==7 &amp; rep==9)) %&gt;%
+  mutate(row=rev(row), column=rev(column))
+
+cor4 &lt;- plants %&gt;% filter((parent.pop==&quot;SQ2&quot; &amp; mf==1 &amp; rep==6) | (parent.pop==&quot;LV1&quot; &amp; mf==1 &amp; rep==6)) %&gt;%
+  mutate(row=rev(row), column=rev(column))
+
+cor5 &lt;- plants %&gt;% filter((parent.pop==&quot;YO4&quot; &amp; mf==3 &amp; rep==12) | (parent.pop==&quot;LV1&quot; &amp; mf==7 &amp; rep==10)) %&gt;%
+  mutate(row=rev(row), column=rev(column))
+
+corrected &lt;- corrected %&gt;%
+  rows_update(bind_rows(cor2, cor3, cor4, cor5), by=c(&quot;parent.pop&quot;, &quot;mf&quot;, &quot;rep&quot;))
+
+# Fix Bed K block swaps
+
+cor6 &lt;- plants %&gt;% filter(block==&quot;K2&quot; &amp; row &gt; 22 &amp; row &lt; 37) %&gt;%
+  mutate(block=&quot;K1&quot;, row=row-22)
+
+cor7 &lt;- plants %&gt;% filter(block==&quot;K1&quot; &amp; row &lt; 15) %&gt;%
+  mutate(block=&quot;K2&quot;, row=row+22)
+
+corrected &lt;- corrected %&gt;%
+  rows_update(bind_rows(cor6,cor7), by=c(&quot;parent.pop&quot;, &quot;mf&quot;, &quot;rep&quot;))
+
+plants &lt;- corrected
+
+plants %&gt;% arrange(parent.pop, mf, rep) %&gt;%
+  select(parent.pop, mf, rep, bed, block, row, column, everything() ) %&gt;% write_sheet(&quot;https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4&quot;,
+                                                        sheet=&quot;Corrected Bed Map 2022-12-06&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiQXV0by1yZWZyZXNoaW5nIHN0YWxlIE9BdXRoIHRva2VuLlxu4pyUIFdyaXRpbmcgdG8gUG9wc19mb3JfMjAyMl9VQ0QuXG7inJQgV3JpdGluZyB0byBzaGVldCBDb3JyZWN0ZWQgQmVkIE1hcCAyMDIyLTEyLTA2LlxuIn0= -->
+<pre><code>Auto-refreshing stale OAuth token.
+✔ Writing to Pops_for_2022_UCD.
+✔ Writing to sheet Corrected Bed Map 2022-12-06.</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuICBcbmBgYCJ9 -->
+<pre class="r"><code>  </code></pre>
+<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
