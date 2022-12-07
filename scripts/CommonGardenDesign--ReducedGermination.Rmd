@@ -464,6 +464,54 @@ plants %>% arrange(parent.pop, mf, rep) %>%
                                                         sheet="New Bed Map")
 ```
 
+### Correct positions for field mistakes / swaps
+
+```{r}
+# Fix replacement made in screenhouse:
+cor1 <- plants %>% filter(parent.pop=="YO8" & mf==7 & rep==12) %>%
+  mutate(parent.pop="SQ3", mf=2, rep=14)
+
+corrected <- plants %>%
+  rows_update(cor1, by=c("block", "row", "column"))
+
+# Fix swaps made while planting
+
+cor2 <- plants %>% filter((parent.pop=="YO8" & mf==2 & rep==8) |( parent.pop=="FR" & mf==5 & rep==1)) %>%
+  mutate(row=rev(row))
+
+cor3 <- plants %>% filter((parent.pop=="YO7" & mf==4 & rep==5) | (parent.pop=="TM2" & mf==7 & rep==9)) %>%
+  mutate(row=rev(row), column=rev(column))
+
+cor4 <- plants %>% filter((parent.pop=="SQ2" & mf==1 & rep==6) | (parent.pop=="LV1" & mf==1 & rep==6)) %>%
+  mutate(row=rev(row), column=rev(column))
+
+cor5 <- plants %>% filter((parent.pop=="YO4" & mf==3 & rep==12) | (parent.pop=="LV1" & mf==7 & rep==10)) %>%
+  mutate(row=rev(row), column=rev(column))
+
+corrected <- corrected %>%
+  rows_update(bind_rows(cor2, cor3, cor4, cor5), by=c("parent.pop", "mf", "rep"))
+
+# Fix Bed K block swaps
+
+cor6 <- plants %>% filter(block=="K2" & row > 22 & row < 37) %>%
+  mutate(block="K1", row=row-22)
+
+cor7 <- plants %>% filter(block=="K1" & row < 15) %>%
+  mutate(block="K2", row=row+22)
+
+corrected <- corrected %>%
+  rows_update(bind_rows(cor6,cor7), by=c("parent.pop", "mf", "rep"))
+
+plants <- corrected
+
+plants %>% arrange(parent.pop, mf, rep) %>%
+  select(parent.pop, mf, rep, bed, block, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+                                                        sheet="Corrected Bed Map 2022-12-06")
+  
+```
+
+
+
 ## combine bed map and field map
 
 ```{r, fig.width=12}
