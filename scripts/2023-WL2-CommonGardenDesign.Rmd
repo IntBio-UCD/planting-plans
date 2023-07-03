@@ -34,8 +34,8 @@ seed
 ```{r}
 # extra seed
 extra <- read_sheet(popsheet, 
-                   sheet = "extra mf reps",
-                   na=c("NA", "")
+                    sheet = "extra mf reps",
+                    na=c("NA", "")
 ) %>%
   filter(`use as experimental` == 1) %>%
   select(-notes) %>%
@@ -95,8 +95,8 @@ germinated_lowrep <- germinated %>%
   filter(reps < 13) %>% # because 14 blocks and 14 represents full replication
   group_by(parent.pop) %>%
   mutate(block= {map(1:ceiling(n()/13), ~ sample(germblocks)) %>%
-       unlist() %>% magrittr::extract(1:n())}, # clean up last rep
-         ) %>%
+      unlist() %>% magrittr::extract(1:n())}, # clean up last rep
+  ) %>%
   ungroup() 
 
 #For high rep mfs, just use the sequentially assigned blocks
@@ -233,7 +233,7 @@ Fill in the blanks...(not filling in buffers for WL2 becuase spacing is uncertai
 germ.fill <- germinated %>%
   group_by(block) %>%
   expand(row=1:max(row), column) #no buffer rows.  But should fill ragged edges.
- # expand(row=1:max(row+2), column) # use this if you want buffer rows
+# expand(row=1:max(row+2), column) # use this if you want buffer rows
 
 germinated <- germ.fill %>%
   left_join(germinated) %>%
@@ -296,17 +296,15 @@ germinated %>% arrange(parent.pop, mf, rep) %>%
 # plants %>% arrange(parent.pop, mf, rep) %>%
 #   select(parent.pop, mf, rep, bed, block, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
 #                                                         sheet="Corrected Bed Map 2022-12-06")
-  
+
 ```
 
 
 
 ## combine bed map and field map
 
-NOT UPDATED FOR 2023 WL2
 
 ```{r, fig.width=12}
-
 plan3_plants <- plan3 %>%
   mutate(column=LETTERS[column]) %>%
   full_join(germinated) %>%
@@ -314,35 +312,39 @@ plan3_plants <- plan3 %>%
   mutate(label=ifelse(is.na(label), "buff", label)) %>%
   filter(!is.na(block))
 
+# Planting map still needs to be fixed
+# pdf("../output/2023-WL2-planting_maps.pdf",width = 8.5, height = 11)
+# 
+# for(b in unique(plan3_plants$block)) {
+#   pl <- plan3_plants %>% filter(block==b) %>%
+#     ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
+#     geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+#     geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
+#     coord_equal() + 
+#     theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+#     xlab("position (cm)") + ylab("position (cm)") +
+#     scale_y_reverse() + 
+#     ggtitle(str_c("Block ", b, germlabel))
+#   print(pl)
+# }
+# 
+# dev.off()
+```
 
-pdf("../output/2023-WL2-planting_maps.pdf",width = 8.5, height = 11)
 
-for(b in unique(plan3_plants$block)) {
-  pl <- plan3_plants %>% filter(block==b) %>%
-    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
-    geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
-    geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
-    coord_equal() + 
-    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
-    xlab("position (cm)") + ylab("position (cm)") +
-    scale_y_reverse() + 
-    ggtitle(str_c("Block ", b, germlabel))
-  print(pl)
-}
-
-dev.off()
-
+```{r, fig.width=12}
 pdf("../output/2023-WL2-randomization_maps.pdf",width = 8.5, height = 11)
 
-for(b in unique(plan3_plants$block)) {
-  germlabel <- ifelse(b %in% germblocks, " germinated", " NOT germinated")
-  pl <- plan3_plants %>% filter(block==b) %>%
-    ggplot(aes(x0=column, y0=row, label=label)) +
-    geom_label(aes(x=column, y=row), size=3.5, lineheight=.8) +
-    coord_equal() + 
+for(b in unique(germinated$block)) {
+  pl <- germinated %>% filter(block==b) %>%
+    mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
+    mutate(label=ifelse(is.na(label), "buff", label)) %>%
+    ggplot() +
+    geom_label(aes(x=column, y=row, label=label), size=3, lineheight=.8) +
     theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
-    scale_y_reverse(breaks = 1:44) +
-    ggtitle(str_c("Block ", b, germlabel))
+    scale_y_reverse(breaks = 1:31) +
+    ggtitle(str_c("Block ", b)) +
+    coord_equal(ratio=.8)
   print(pl)
 }
 
