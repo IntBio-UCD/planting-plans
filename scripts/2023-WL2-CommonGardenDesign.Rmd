@@ -338,53 +338,25 @@ plan3_plants <- plan3 %>%
 
 Randomization maps
 
-Each flat is 14 X 7.  Because of space limitations we are going to lay out the plants the wide-way in the flats, and treat flats as 12X7
-```{r, fig.width=11, fig.height=8.5}
+```{r, fig.height=11, fig.width=8.5}
 
-flat_map <- germinated %>%
-  group_by(block) %>%
-  mutate(flat=str_c(block, 
-                    { rep(1:ceiling((n()/(12*7))), 
-                          each=12*7) %>% 
-                        magrittr::extract(1:n()) }
-  )) %>%
-  group_by(flat) %>%
-  arrange(row, column) %>%
-  mutate(flat_column= { c(rep(LETTERS[1:4], 7),
-                       rep(LETTERS[5:8], 7),
-                       rep(LETTERS[9:12], 7)) %>%
-          magrittr::extract(1:n()) },
-      flat_row= { c(rep(1:7, each=4),
-                    rep(1:7,each=4),
-                    rep(1:7,each=4)) %>%
-          magrittr::extract(1:n())}
-  ) %>% 
-  ungroup() %>%
-  arrange(block, row, column)
+pdf("../output/2023-WL2-randomization_maps.pdf",width = 8.5, height = 11)
 
-flat_map %>% arrange(parent.pop, mf, rep) %>%
-  select(parent.pop, mf, rep, block, flat, flat_row, flat_column, everything() ) %>% 
-  write_sheet(popsheet,
-              sheet="Flat Map")
-
-pdf("../output/2023-WL2-randomization_maps.pdf",width = 11, height = 8.5)
-
-for(f in unique(flat_map$flat)) {
-  pl <- flat_map %>% filter(flat==f) %>%
+for(b in unique(germinated$block)) {
+  pl <- germinated %>% filter(block==b) %>%
     mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
     mutate(label=ifelse(is.na(label), "buff", label)) %>%
-    complete(flat, flat_column=LETTERS[1:14], flat_row, fill = list(label=" ")) %>%
     ggplot() +
-    geom_label(aes(x=flat_column, y=flat_row, label=label), size=4, lineheight=.8) +
-    theme(axis.text = element_text( size=12)) +
-    scale_y_reverse(breaks = 1:7) +
-    ggtitle(str_c("Flat ", f)) +
-    coord_equal(ratio=1.2) +
-    geom_vline(xintercept = c(0.5, 4.5, 8.5, 12.5))
+    geom_label(aes(x=column, y=row, label=label), size=3, lineheight=.8) +
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    scale_y_reverse(breaks = 1:31) +
+    ggtitle(str_c("Block ", b)) +
+    coord_equal(ratio=.8)
   print(pl)
 }
 
 dev.off()
 
 ```
+
 
