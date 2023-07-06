@@ -348,10 +348,11 @@ for(b in unique(germinated$block)) {
     mutate(label=ifelse(is.na(label), "buff", label)) %>%
     ggplot() +
     geom_label(aes(x=column, y=row, label=label), size=3, lineheight=.8) +
-    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    theme(axis.text = element_text(size=12)) +
     scale_y_reverse(breaks = 1:31) +
+    scale_x_discrete(position = "top") +
     ggtitle(str_c("Block ", b)) +
-    coord_equal(ratio=.8)
+    coord_equal(ratio=.5)
   print(pl)
 }
 
