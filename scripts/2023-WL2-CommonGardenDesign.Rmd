@@ -143,7 +143,7 @@ buffer.rows <- 2 # on each edge of each bed
 exp.beds <- 11
 beds <- letters[1:(buffer.beds+exp.beds)]
 columns <- 4 # per bed
-rows <- 1550/25 # four of which are buffers
+rows <- 63 # four of which are buffers
 plants <- length(beds) * columns * rows
 bedwidth <- 90 # cm
 furrow <- 100 #cm
@@ -184,16 +184,18 @@ plan3
 add indicator for whether or not a position is inbounds 
 
 ```{r}
-bedwidths   <- c(15.5, 15, 14.9, 14.5, 13, 12, 11.3, 8, 6.5, 5, 4.5) * 100
+bedrows   <- c(63, 61, 60, 59, 53, 47, 45, 34, 24, 20, 16)
+
 plan3 <- plan3 %>%
-  mutate(inbounds=ifelse(y_pos <= bedwidths[bedcol], "in-bounds", "out-of-bounds"))
+  mutate(inbounds=ifelse(row <= bedrows[bedcol], "in-bounds", "out-of-bounds"))
 
 # black out tree position (approx)
 plan3 <- plan3 %>%
-  mutate(inbounds=ifelse(bedcol %in% c(5,6) & y_pos > 750 & y_pos <=1000, "out-of-bounds", inbounds))
+  mutate(inbounds=ifelse(bedcol == 5 & row > bedrows[5] -23 & row <= bedrows[5]-13, "out-of-bounds", inbounds),
+         inbounds=ifelse(bedcol == 6 & row > bedrows[6] -19 & row <= bedrows[6]-9, "out-of-bounds", inbounds)
+         )
 
 ```
-
 
 Plot it
 ```{r, fig.width=12, eval=FALSE}
@@ -233,7 +235,7 @@ germinated  %>% arrange(block, row, column)
 
 germinated  %>% arrange(parent.pop, mf) # confirm different positions per block
 ```
-Fill in the blanks...(not filling in buffers for WL2 because spacing is uncertain)
+Fill in the blanks...(not filling in buffers for WL2 planting because spacing is uncertain)
 ```{r}
 germ.fill <- germinated %>%
   group_by(block) %>%
@@ -307,6 +309,52 @@ germinated %>% arrange(parent.pop, mf, rep) %>%
 
 
 ## combine bed map and field map
+
+### Add buffers to the edge of each bed
+
+We will preserve some space at the edge of each bed for buffers. These can literally be buffer plants, or they can be used to hold plants that could not be planted into their assigned location (e.g. due to rocks)
+
+```{r}
+# number of available positions
+sum(plan3$inbounds=="in-bounds")
+
+# number of plants to plant
+nrow(germinated)
+
+# "extra" positions
+sum(plan3$inbounds=="in-bounds") - nrow(germinated)
+
+# extra positions per bed:
+(sum(plan3$inbounds=="in-bounds") - nrow(germinated)) / exp.beds
+
+```
+6 rows of buffer for the first 10 beds and 5 rows of buffer for the last bed.
+
+```{r}
+plan3 <- plan3 %>%
+  
+  #top buffers:
+  mutate(buffer=(row<=3 & bed!= letters[exp.beds]) | (row <=2 & bed==letters[exp.beds]), 
+         
+  #bottom buffers
+         buffer=ifelse(row > (bedrows[bedcol]-3) & row <= bedrows[bedcol], TRUE, buffer),
+         status=ifelse(buffer, "buffer", inbounds)
+  )
+
+# plot it for reality check
+plan3 %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, fill=status)) +
+  geom_circle(alpha=.75) + 
+  scale_fill_manual(values=c("out-of-bounds"="grey40", "in-bounds"="green",  "buffer" = "yellow")) +
+  coord_equal() + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (cm)") + ylab("position (cm)") +
+  scale_y_reverse() +
+  ggtitle(str_c("Total inbounds + buffer positions = ", sum(plan3$inbounds=="in-bounds")))
+
+ggsave("../output/2023-WL2-FieldPlan.jpeg", width = 10, height = 6)
+```
 
 
 ```{r, fig.width=12}
