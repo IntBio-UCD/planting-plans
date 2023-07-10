@@ -356,32 +356,87 @@ plan3 %>%
 ggsave("../output/2023-WL2-FieldPlan.jpeg", width = 10, height = 6)
 ```
 
+### now combine them.
 
-```{r, fig.width=12}
+Should work to subset the plan3 to only have inbounds, then just do a column bind, and then add the rest (buffers and out-of-bounds) back in.  Then do some swapping of row and column numbers in the even numbered beds.
+
+arrange tibbles
+```{r}
+germinated <- germinated %>%
+  ungroup() %>%
+  arrange(block, row, column) %>%
+  rename(blockrow=row, blockcolumn=column)
+
+plan3 <- plan3 %>%
+  ungroup() %>%
+  arrange(bedcol, row, column) %>%
+  rename(bedrow=row)
+```
+
+
+combine them and reverse positions for even rows
+```{r}
 plan3_plants <- plan3 %>%
-  mutate(column=LETTERS[column]) %>%
-  full_join(germinated) %>%
-  mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
-  mutate(label=ifelse(is.na(label), "buff", label)) %>%
-  filter(!is.na(block))
+  filter(status=="in-bounds") %>%
+  bind_cols(germinated)
 
-# Planting map still needs to be fixed
-# pdf("../output/2023-WL2-planting_maps.pdf",width = 8.5, height = 11)
-# 
-# for(b in unique(plan3_plants$block)) {
-#   pl <- plan3_plants %>% filter(block==b) %>%
-#     ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
-#     geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
-#     geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
-#     coord_equal() + 
-#     theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
-#     xlab("position (cm)") + ylab("position (cm)") +
-#     scale_y_reverse() + 
-#     ggtitle(str_c("Block ", b, germlabel))
-#   print(pl)
-# }
-# 
-# dev.off()
+# reverse positions in even beds (to "snake" the blocks through the beds)
+plan3_plants <- plan3_plants %>%
+  group_by(bedcol) %>%
+  mutate(across(.cols=block:`germinated?`, .fns= ~ ifelse(bedcol%%2==0, rev(.x), .x)))
+
+# add back in the buffer and out of bounds rows
+plan3_plants <- plan3 %>%
+  filter(status!="in-bounds") %>% 
+  bind_rows(plan3_plants) %>%
+  arrange(bed, bedrow, column)
+
+plan3_plants
+```
+
+
+```{r}
+plan3_plants <- plan3_plants %>%
+  mutate(column=LETTERS[column]) %>%
+  mutate(label=ifelse(buffer, "buff", str_c(parent.pop, "\n", mf, "-", rep) ),
+         label=ifelse(parent.pop=="buffer", "buff", label),
+         label=ifelse(is.na(label), "", label),
+         colorblock=ifelse(is.na(block), status, block))
+```
+
+
+```{r, fig.height=12}
+pdf("../output/2023-WL2-planting_maps.pdf",width = 8.5, height = 11)
+
+colors=c("grey40", "yellow", rep(c("magenta", "skyblue", "green"), length.out=exp.beds)) %>%
+  set_names("out-of-bounds", "buffer", LETTERS[1:exp.beds])
+
+for(b in unique(plan3_plants$bed)) {
+  pl1 <- plan3_plants %>% filter(bed==b, bedrow<33) %>%
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label, fill=colorblock)) +
+    scale_fill_manual(values=colors) +
+    geom_circle(alpha=.25, color="grey70") +
+    geom_text(aes(x=x_pos, y=y_pos), size=3, lineheight=.8) +
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() +
+    coord_equal(ratio=.4) + 
+    ggtitle(str_c("Bed ", b, ", sheet 1"))
+  print(pl1)
+  pl2 <- plan3_plants %>% filter(bed==b, bedrow>=33) %>%
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label, fill=colorblock)) +
+    scale_fill_manual(values=colors) +
+    geom_circle(alpha=.25, color="grey70") +
+    geom_text(aes(x=x_pos, y=y_pos), size=3, lineheight=.8) +
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() +
+    coord_equal(ratio=.4) + 
+    ggtitle(str_c("Bed ", b, ", sheet 2"))
+  print(pl2)
+}
+
+dev.off()
 ```
 
 Randomization maps
