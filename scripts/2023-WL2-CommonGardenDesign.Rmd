@@ -224,8 +224,11 @@ ggsave("../output/2023-WL2-FieldPlan.jpeg", width = 10, height = 6)
 set.seed(999)
 germinated <- germinated %>% 
   group_by(block) %>%
-  # mutate(row=rep(1:(ceiling(n()/columns)), each=columns, length.out=n())) %>% #no buffer rows
-    mutate(row=rep(2:(1+ceiling(n()/columns)), each=columns, length.out=n())) %>% #use if you want buffer rows
+    mutate(., row=if(unique(block) %in% c("C", "E", "H")) { # land locked blocks
+      rep(3:(2+ceiling(n()/columns)), each=columns, length.out=n())  #use if you want buffer rows at the beginning of each bed
+} else { #not land-locked
+     rep(1:(ceiling(n()/columns)), each=columns, length.out=n())  #no beginning buffer rows
+} ) %>%
   mutate(row=sample(row)) %>%
   group_by(block, row) %>%
   mutate(column=sample(LETTERS[1:columns], size=n())) %>%
@@ -239,8 +242,8 @@ Fill in the blanks..
 ```{r}
 germ.fill <- germinated %>%
   group_by(block) %>%
-#  expand(row=1:max(row), column) #no buffer rows.  But should fill ragged edges.
-   expand(row=1:max(row+1), column) # use this if you want buffer rows
+#  expand(row=1:max(row), column) #no end buffer rows.  But should fill ragged edges.
+   expand(row=1:max(row+1), column) # use this if you want buffer rows at the end of each bed
 
 germinated <- germ.fill %>%
   left_join(germinated) %>%
@@ -324,18 +327,21 @@ nrow(germinated)
 # "extra" positions
 sum(plan3$inbounds=="in-bounds") - nrow(germinated)
 
-# extra positions per bed:
-(sum(plan3$inbounds=="in-bounds") - nrow(germinated)) / exp.beds
+# extra rows:
+(sum(plan3$inbounds=="in-bounds") - nrow(germinated)) / 4
+
+
 
 ```
-room for 39 buffer rows total.
+room for 46 buffer rows total.
 
-2 at the end of each bed.  2 at the beginning of the first 6 rows and 1 at the beginning of the remaining 5.
+2 at the end of each bed.  3 at the beginning of the first 2 beds and 2 at the beginning of the remaining 9.
 ```{r}
 plan3 <- plan3 %>%
   
   #top buffers:
-  mutate(buffer=(row<=2 & bed %in% letters[1:6]) | (row <=1 & bed %in% letters[7:exp.beds]), # if you want differnt number of buffers in last row
+  mutate(buffer=(row<=3 & bed %in% letters[1:2]) | (row <=2 & bed %in% letters[3:exp.beds]), # if you want different number of buffers in last row
+
   
   #bottom buffers
          buffer=ifelse(row > (bedrows[bedcol]-2) & row <= bedrows[bedcol], TRUE, buffer),
@@ -392,18 +398,17 @@ plan3_plants <- plan3 %>%
   bind_rows(plan3_plants) %>%
   arrange(bed, bedrow, column)
 
-plan3_plants
-```
 
-
-```{r}
+# set up labels
 plan3_plants <- plan3_plants %>%
   mutate(column=LETTERS[column]) %>%
   mutate(label=ifelse(buffer, "buff", str_c(parent.pop, "\n", mf, "-", rep) ),
-         label=ifelse(parent.pop=="buffer", "buff", label),
+         label=ifelse(status=="in-bounds" & parent.pop=="buffer", "buff", label),
          label=ifelse(is.na(label), "", label),
          colorblock=ifelse(is.na(block), status, block),
-         colorblock=ifelse(parent.pop=="buffer", "buffer", colorblock))
+         colorblock=ifelse(status=="in-bounds" & parent.pop=="buffer", "buffer", colorblock))
+
+plan3_plants
 ```
 
 
