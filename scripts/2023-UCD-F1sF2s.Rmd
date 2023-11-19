@@ -1,0 +1,367 @@
+---
+title: "2023 UCD F1s F2s Design"
+output: html_notebook
+---
+
+## Intro
+
+Determine randomization strategy.
+
+This is written for UCD Fall 2023 planting.
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(ggforce)
+
+is.even <- function(x) x%%2 == 0
+
+url <- "https://docs.google.com/spreadsheets/d/1BM5wVLOffxUdHC1yCBJbv3le5hf7Q-WspYVM_nYBiXQ"
+```
+
+## get germination data
+
+parents
+```{r}
+parents <- read_sheet(url, 
+                      sheet = "parent pop labels and germination",
+                      na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, mf, rack, pop.id, rep = mf.rep) %>%
+  mutate(pop.id = ifelse(pop.id %in% c("TM2", "WL2"), #because we have more reps of the mfs for these two it makes sense to randomize per mf instead of per pop.
+                         str_c(pop.id, "-", mf),
+                         pop.id))
+parents
+```
+
+F1s
+```{r}
+F1s <- read_sheet(url, 
+                  sheet = "F1s labels and germination",
+                  na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, rack, pop.id, rep)
+F1s
+```
+
+F2s
+```{r}
+F2s <- read_sheet(url, 
+                  sheet = "F2s labels and germination",
+                  na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, rack, pop.id, rep)
+F2s
+```
+
+
+```{r}
+# extra plants
+extra <- read_sheet(url, 
+                    sheet = "extra plants",
+                    na=c("NA", "")
+)  %>%
+  mutate(across(.cols= c(dame, sire), .fns = str_remove, "( |-)[^)]*$" ),
+         pop.id = str_c(dame, " x ", sire ),
+         unique.ID=seq(from=2001, length.out=n()),
+         rack = NaN) %>%
+   select(-dame, -sire, rep = `extra rep number`)
+
+extra
+```
+
+```{r}
+combined <- bind_rows(parents, F1s, F2s, extra)
+
+combined
+```
+
+## assign blocks to combined
+
+Can plant 176  plants per bed (44 rows * 4 columns)
+```{r}
+nrow(combined) 
+nrow(combined) / 176
+```
+
+get a histogram of rep count
+
+```{r}
+combined %>%
+  group_by(pop.id) %>%
+  summarize(n=n()) %>%
+  ggplot(aes(x=n)) +
+  geom_histogram(binwidth = 1)
+```
+
+```{r}
+combined %>%
+  group_by(pop.id) %>%
+  summarize(n=n()) %>%
+  arrange(n)
+```
+
+A bit challenging because for pops with few reps total we should be careful to distribute the pops across the blocks.
+
+I think one way this can work is to arrange by pops and then assign a randomized set of block labels to it.
+
+```{r}
+
+beds <- LETTERS[1:6]
+
+set.seed(999)
+blocks <- str_c(rep(beds,2), rep(1:2, each=length(beds))) %>% sample() # random arrangement...will be helpful below
+
+reps <- ceiling(nrow(combined) / length(blocks) ) # number of times we have to assign blocks
+
+combined <- combined %>%
+  mutate(block = rep(blocks, length.out=n()),
+         bed=str_sub(block, 1, 1))
+
+combined  
+```
+reality check distribution across pop.ids
+```{r}
+combined %>%
+  arrange(block) %>%
+  pivot_wider(id_cols = c(pop.id), names_from = block, values_from = bed, values_fill = 0, values_fn = ~ 1)
+```
+
+plants per block:
+```{r}
+combined %>%
+  group_by(block) %>%
+  summarise(n=n())
+```
+
+## planting grid
+
+60 inch veg crops bed is 100 cm of plantable width.  
+
+Create grid
+```{r}
+stagger <- TRUE
+buffer.beds <- 0
+buffer.rows <- 1 # on each edge of each bed
+exp.beds <- 6
+beds <- LETTERS[1:(buffer.beds+exp.beds)]
+columns <- 4 # per bed
+rows <- 45 # two of which are buffers
+plants <- length(beds) * columns * rows
+bedwidth <- 100 # cm
+furrow <- 52 #cm
+size <- 30 # plant diameter
+radius <- size/2 
+blankevery <- 2 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
+expandfactor <- blankevery/(blankevery-1)
+
+plan3 <- expand_grid(bed=beds,
+                     column=1:columns,
+                     row=1:rows,
+                     radius=radius)
+
+plan3 <- plan3 %>%
+  mutate(plantedcol=(match(bed, LETTERS)-1)*4 + column,
+         bedcol = floor((match(bed, LETTERS)-1)*expandfactor + 1   )) 
+
+plan3
+```
+
+add positions
+```{r}
+if (stagger) {
+  ## first part needs to be updated for beds
+  column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
+  plan3 <- plan3 %>%
+    mutate(y_pos=ifelse(is.even(column),
+                        row*size, 
+                        row*size-radius),
+           x_pos=ifelse(column==1,
+                        radius+(bedcol-1)*(bedwidth+furrow),
+                        radius+(column-1)*column_offset+(bedcol-1)*(bedwidth+furrow)))
+} else {
+  plan3 <- plan3 %>%
+    mutate(y_pos=row*size,
+           x_pos=bedcol*(bedwidth+furrow))
+}
+plan3
+```
+Plot it
+```{r, fig.width=12, eval=FALSE}
+
+#create bed labels
+# bed.labels <- plan3 %>%
+#   group_by(bed) %>%
+#   summarize(x_pos = mean(x_pos+bed_x_offset), y_pos=max(y_pos*1.075)) 
+
+
+plan3 %>% #filter(bed=="A", row <6) %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal() + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (cm)") + ylab("position (cm)")
+
+ggsave("../output/UCD2023-FieldPlan.jpeg", width = 10, height = 6)
+```
+
+Plot it in feet
+```{r, fig.width=12, eval=FALSE}
+
+#create bed labels
+# bed.labels <- plan3 %>%
+#   group_by(bed) %>%
+#   summarize(x_pos = mean(x_pos+bed_x_offset), y_pos=max(y_pos*1.075)) 
+
+
+plan3 %>% #filter(bed=="A", row <6) %>%
+  mutate(across(.cols=c(x_pos, y_pos, radius), ~ .x*0.0328084)) %>% # convert cm to feet
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius)) +
+  geom_circle(fill="lightgreen", alpha=.25) + 
+  coord_equal(xlim = c(4,145)) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (feet)") + ylab("position (feet)") 
+
+# ggsave("../output/FieldPlan.jpeg", width = 10, height = 6)
+```
+
+Output spacing for Black A to use as guide for cuting holes
+```{r, fig.width=8, fig.height=10.5, eval=FALSE}
+
+x_labels <- plan3 %>% filter(bed=="A") %>% pull(x_pos) %>% round(1) %>% unique()
+
+plan3 %>% filter(bed=="A") %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
+  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+  geom_text(aes(x=x_pos, y=y_pos), size=3) +
+  scale_x_continuous(breaks = x_labels) +
+  coord_equal(ylim = c(20,660)) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+  xlab("position (cm)") + ylab("position (cm)") 
+ggsave("../output/spacing_guide_1.pdf", width = 8, height = 10.5)
+
+plan3 %>% filter(bed=="A") %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=y_pos)) +
+  geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+  geom_text(aes(x=x_pos, y=y_pos), size=3) +
+  scale_x_continuous(breaks = x_labels) +
+  coord_equal(ylim = c(700,1320)) + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+  xlab("position (cm)") + ylab("position (cm)") 
+ggsave("../output/spacing_guide_2.pdf", width = 8, height = 10.5)
+```
+
+
+## Assign Plants
+
+### combined
+
+```{r}
+set.seed(999)
+first_row <- 2 # set to 1 more than number of initial buffer rows
+combined <- combined %>% 
+  group_by(bed) %>%
+  arrange(block) %>%
+  mutate(row=rep(first_row:(first_row - 1 + ceiling(n()/columns)), each=columns, length.out=n())) %>%
+  group_by(block) %>%
+  mutate(row=ifelse(str_sub(block,2,2) == "2" & (length(row[row==min(row)]) < columns), row+1, row)) %>% # adjusts for incomplete rows in first block in each bed
+  mutate(row=sample(row)) %>% # randomize rows
+  group_by(bed, row) %>%
+  mutate(column=sample(LETTERS[1:columns], size=n())) # randomize columns
+
+combined  %>% arrange(block, row) 
+
+combined  %>% arrange(pop.id, block) # confirm different positions per block
+```
+
+Fill in the blanks...
+```{r}
+combined.fill <- combined %>% 
+  filter(str_detect(block, "1")) %>%
+  group_by(block) %>%
+  expand(row=1:max(row), column) %>%
+  mutate(bed=str_sub(block, 1,1))
+
+combined.fill <- combined %>%
+  filter(str_detect(block, "2")) %>%
+  group_by(block) %>%
+  expand(row=min(row):(max(row)+buffer.rows), column) %>%
+  bind_rows(combined.fill) %>%
+  mutate(bed=str_sub(block, 1,1))
+
+combined <- combined.fill %>%
+  left_join(combined) %>%
+  mutate(pop.id=ifelse(is.na(pop.id), "buffer", pop.id))
+
+# ,
+# block=ifelse(!is.na(block), block, 
+#              ifelse(row < 3, str_c(bed,"1"), str_c(bed, "2"))))
+
+combined
+```
+
+
+Write it out
+```{r}
+combined %>% arrange(unique.ID) %>%
+  select(rack, unique.ID, pop.id, mf, rep, bed, block, row, column, everything() ) %>% write_sheet(url,
+                                                                                      sheet="New Bed Map")
+```
+
+
+
+
+
+## combine bed map and field map
+
+```{r, fig.width=12}
+
+plan3_plants <- plan3 %>%
+  mutate(column=LETTERS[column]) %>%
+  full_join(combined) %>%
+  mutate(label=ifelse(pop.id=="buffer", "buff", unique.ID) ) %>%
+  mutate(label=ifelse(is.na(label), "buff", label)) %>%
+  filter(!is.na(block))
+
+
+pdf("../output/UCD2023_planting_maps.pdf",width = 8.5, height = 11)
+
+for(b in unique(plan3_plants$block)) {
+  pl <- plan3_plants %>% filter(block==b) %>%
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label)) +
+    geom_circle(fill="lightgreen", alpha=.25, color="grey70") + 
+    geom_text(aes(x=x_pos, y=y_pos), size=3.5, lineheight=.8) +
+    coord_equal() + 
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() + 
+    ggtitle(str_c("Block ", b))
+  print(pl)
+}
+
+dev.off()
+
+pdf("../output/UCD2023_randomization_maps.pdf",width = 8.5, height = 11)
+
+for(b in unique(plan3_plants$block)) {
+  pl <- plan3_plants %>% filter(block==b) %>%
+    ggplot(aes(x0=column, y0=row, label=label)) +
+    geom_label(aes(x=column, y=row), size=3.5, lineheight=.8) +
+    coord_equal() + 
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    scale_y_reverse(breaks = 1:45) +
+    ggtitle(str_c("Block ", b))
+  print(pl)
+}
+
+dev.off()
+
+```
+
