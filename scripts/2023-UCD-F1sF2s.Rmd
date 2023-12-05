@@ -64,11 +64,11 @@ extra <- read_sheet(url,
                     sheet = "extra plants",
                     na=c("NA", "")
 )  %>%
-  mutate(across(.cols= c(dame, sire), .fns = str_remove, "( |-)[^)]*$" ),
-         pop.id = str_c(dame, " x ", sire ),
+  mutate(across(.cols= c(`dame-mf`, `sire-mf`), .fns = str_remove, "( |-)[^)]*$" ),
+         pop.id = str_c(`dame-mf`, " x ", `sire-mf` ),
          unique.ID=seq(from=2001, length.out=n()),
          rack = NaN) %>%
-   select(-dame, -sire, rep = `extra rep number`)
+   select(-`dame-mf`, -`sire-mf`, rep)
 
 extra
 ```
@@ -153,9 +153,12 @@ rows <- 45 # two of which are buffers
 plants <- length(beds) * columns * rows
 bedwidth <- 100 # cm
 furrow <- 52 #cm
-size <- 30 # plant diameter
+size <- 30 # plant diameter in cm
 radius <- size/2 
+
+#blankevery wouldn't be needed under current design, but is being kept because the code still uses it.
 blankevery <- 2 # what is the spacing between blank beds?  (2 means every other; 3 means every third)
+
 expandfactor <- blankevery/(blankevery-1)
 
 plan3 <- expand_grid(bed=beds,
@@ -168,9 +171,11 @@ plan3 <- plan3 %>%
          bedcol = floor((match(bed, LETTERS)-1)*expandfactor + 1   )) 
 
 plan3
+
+#note plantedcol is needed for ggplot to get the "columns" in the correct place on the graph.
 ```
 
-add positions
+add positions (e.g. the centimeter position of each plant, not just its row and column#)
 ```{r}
 if (stagger) {
   ## first part needs to be updated for beds
@@ -182,7 +187,7 @@ if (stagger) {
            x_pos=ifelse(column==1,
                         radius+(bedcol-1)*(bedwidth+furrow),
                         radius+(column-1)*column_offset+(bedcol-1)*(bedwidth+furrow)))
-} else {
+} else { #no stagger
   plan3 <- plan3 %>%
     mutate(y_pos=row*size,
            x_pos=bedcol*(bedwidth+furrow))
@@ -271,7 +276,9 @@ combined <- combined %>%
   arrange(block) %>%
   mutate(row=rep(first_row:(first_row - 1 + ceiling(n()/columns)), each=columns, length.out=n())) %>%
   group_by(block) %>%
-  mutate(row=ifelse(str_sub(block,2,2) == "2" & (length(row[row==min(row)]) < columns), row+1, row)) %>% # adjusts for incomplete rows in first block in each bed
+  mutate(row=ifelse(str_sub(block,2,2) == "2" #if block 2 in each bed
+                    & (length(row[row==min(row)]) < columns), #and if the first row in block 2 is incomplete
+                    row+1, row)) %>% # adjusts for incomplete rows in first block in each bed
   mutate(row=sample(row)) %>% # randomize rows
   group_by(bed, row) %>%
   mutate(column=sample(LETTERS[1:columns], size=n())) # randomize columns
