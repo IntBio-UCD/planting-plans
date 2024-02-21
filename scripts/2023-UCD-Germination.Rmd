@@ -1,0 +1,115 @@
+---
+title: "2023-UCD-Germination"
+author: "Julin Maloof"
+date: "2024-02-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Analyze Germination of F1s and F2s to see if high altitude parentage impacts germination %
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(ggforce)
+
+is.even <- function(x) x%%2 == 0
+
+url <- "https://docs.google.com/spreadsheets/d/1BM5wVLOffxUdHC1yCBJbv3le5hf7Q-WspYVM_nYBiXQ"
+```
+
+F1s
+```{r}
+F1s <- read_sheet(url, 
+                  sheet = "F1s labels and germination",
+                  na=c("NA", "")
+) %>% 
+  select(unique.ID, rack, pop.id, rep, germinated.y.n)
+F1s
+```
+
+F2s
+```{r}
+F2s <- read_sheet(url, 
+                  sheet = "F2s labels and germination",
+                  na=c("NA", "")
+) %>% 
+  select(unique.ID, rack, pop.id, rep, germinated.y.n)
+F2s
+```
+
+List of all pops
+```{r}
+allpops <- c(F1s$pop.id, F2s$pop.id) %>% unique() %>%
+  str_extract_all("[A-Z]{2,3}[1-9]{0,2}") %>%
+  unlist() %>%
+  unique()
+allpops
+```
+
+
+Elevation
+```{r}
+el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
+  filter(`Species Code`=="STTO") %>%
+  mutate(elevation=unlist(`Elevation (m)`)) %>%
+  select(pop.id=`Site code`, elevation) %>%
+  mutate(pop.id=str_replace(pop.id, "YOSE", "YO"))
+
+el <- tibble(pop.id=allpops) %>%
+  left_join(el) %>%
+  mutate(high=elevation>2000)
+
+el
+```
+
+
+```{r}
+high_regex <- el %>%
+  filter(high) %>% 
+  pull(pop.id) %>%
+  str_c(collapse = "|")
+
+high_regex
+
+low_regex <- el %>%
+  filter(!high) %>% 
+  pull(pop.id) %>%
+  str_c(collapse = "|")
+
+low_regex
+```
+
+```{r}
+F1s <- F1s %>%
+  mutate(count.high=str_count(pop.id, high_regex),
+         count.low=str_count(pop.id, low_regex),
+         prop.high = count.high / (count.high + count.low))
+
+F1s
+```
+
+```{r}
+F1s %>%
+  group_by(prop.high) %>%
+  summarise(avg.germ = mean(germinated.y.n))
+```
+
+```{r}
+F2s <- F2s %>%
+  mutate(count.high=str_count(pop.id, high_regex),
+         count.low=str_count(pop.id, low_regex),
+         prop.high = count.high / (count.high + count.low))
+
+F2s
+```
+
+```{r}
+F2s %>%
+  group_by(prop.high) %>%
+  summarise(avg.germ = mean(germinated.y.n))
+```
+
