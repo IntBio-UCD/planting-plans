@@ -81,13 +81,25 @@ low_regex <- el %>%
   str_c(collapse = "|")
 
 low_regex
+
+all_regex <- el %>% 
+  pull(pop.id) %>%
+  str_c(collapse = "|")
+
+all_regex
 ```
 
 ```{r}
 F1s <- F1s %>%
   mutate(count.high=str_count(pop.id, high_regex),
          count.low=str_count(pop.id, low_regex),
-         prop.high = count.high / (count.high + count.low))
+         prop.high = count.high / (count.high + count.low),
+         maternal.pop = str_extract(pop.id, "^[A-Z]{2,3}[1-9]{0,2}"),
+         paternal.pop = str_extract(pop.id, "[A-Z]{2,3}[1-9]{0,2}$"),
+         maternal.high=str_count(maternal.pop, high_regex),
+         paternal.high=str_count(paternal.pop, high_regex)
+  ) %>%
+  select(-unique.ID, -rep)
 
 F1s
 ```
@@ -97,12 +109,27 @@ F1s %>%
   group_by(prop.high) %>%
   summarise(avg.germ = mean(germinated.y.n))
 ```
+```{r}
+F1s %>%
+  group_by(maternal.high, paternal.high) %>%
+  summarize(avg.germ = mean(germinated.y.n))
+```
+
 
 ```{r}
 F2s <- F2s %>%
-  mutate(count.high=str_count(pop.id, high_regex),
-         count.low=str_count(pop.id, low_regex),
-         prop.high = count.high / (count.high + count.low))
+  mutate(maternal.pop = str_extract(pop.id, "^\\(.*?\\)|[A-Z]{2,3}[1-9]{0,2}"),
+         paternal.pop = { str_extract(pop.id, " \\(.*?\\)$|[A-Z]{2,3}[1-9]{0,2}$") %>%
+             trimws() }, 
+         maternal.high = str_count(maternal.pop, high_regex) / str_count(maternal.pop, all_regex),
+         paternal.high = str_count(paternal.pop, high_regex) / str_count(paternal.pop, all_regex),
+         maternal.grandmother.pop = str_extract(maternal.pop, "[A-Z]{2,3}[1-9]{0,2}"),
+         maternal.grandmother.high = str_count(maternal.grandmother.pop, high_regex)
+         ) %>%
+  rowwise() %>%
+  mutate(prop.high = mean(c(maternal.high, paternal.high)) ) %>%
+  ungroup() %>%
+  select(pop.id, maternal.pop, maternal.grandmother.pop, paternal.pop, maternal.high, paternal.high, everything())
 
 F2s
 ```
@@ -111,5 +138,21 @@ F2s
 F2s %>%
   group_by(prop.high) %>%
   summarise(avg.germ = mean(germinated.y.n))
+```
+
+```{r}
+F2s %>%
+  group_by(maternal.high, paternal.high) %>%
+  summarize(avg.germ = mean(germinated.y.n))
+```
+
+```{r}
+F2s %>%
+  group_by(maternal.grandmother.high, maternal.high, paternal.high) %>%
+  summarize(avg.germ = mean(germinated.y.n))
+```
+
+```{r}
+F2s %>% pull(pop.id) %>% unique()
 ```
 
