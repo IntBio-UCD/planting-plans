@@ -15,6 +15,7 @@ Analyze Germination of F1s and F2s to see if high altitude parentage impacts ger
 library(tidyverse)
 library(googlesheets4)
 library(ggforce)
+library(brms)
 
 is.even <- function(x) x%%2 == 0
 
@@ -113,6 +114,39 @@ F1s %>%
 F1s %>%
   group_by(maternal.high, paternal.high) %>%
   summarize(avg.germ = mean(germinated.y.n))
+```
+
+```{r}
+F1.m1 <- brm(germinated.y.n ~ maternal.high * paternal.high,
+             prior = set_prior("normal(0,4)"),
+             family = "bernoulli",
+             data = F1s,
+             sample_prior = TRUE)
+```
+
+```{r}
+summary(F1.m1)
+plot(F1.m1)
+```
+```{r}
+hypothesis(F1.m1,
+           hypothesis = c("maternal.high=0",
+                          "paternal.high=0",
+                          "maternal.high=paternal.high",
+                          "maternal.high:pateral.high=0"))
+```
+
+
+```{r}
+F1.binom <- F1s %>% group_by(maternal.high, paternal.high) %>%
+  summarize(success=sum(germinated.y.n), failure=sum(germinated.y.n==0))
+
+
+F1s.glm1 <- glm(cbind(F1.binom$success, F1.binom$failure) ~ maternal.high * paternal.high,
+    family = binomial,
+    data = F1.binom)
+
+summary(F1s.glm1)
 ```
 
 
