@@ -130,10 +130,9 @@ plot(F1.m1)
 ```
 ```{r}
 hypothesis(F1.m1,
-           hypothesis = c("maternal.high=0",
-                          "paternal.high=0",
-                          "maternal.high=paternal.high",
-                          "maternal.high:pateral.high=0"))
+           hypothesis = c("maternal.high<0",
+                          "paternal.high<0",
+                          "maternal.high:paternal.high<0"))
 ```
 
 
