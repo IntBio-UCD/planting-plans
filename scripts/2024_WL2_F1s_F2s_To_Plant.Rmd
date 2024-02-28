@@ -36,6 +36,20 @@ dim(F1s_short_summarize) #40 F1 types
 F1s_short_summarize_twenty <- F1s_short_summarize %>% filter(Sum_Seeds >= 20) %>% filter(!is.na(sire_pop)) %>% arrange(Sum_Seeds)
 F1s_short_summarize_twenty
 F1s_short_summarize_twenty %>% filter(Sum_Seeds==20) #13 of the 26 F1s with at least 20 seeds only have 20 seeds 
+
+F1s_short_summarize_twenty %>% filter(Sum_Seeds>20) %>% arrange(desc(Sum_Seeds))
+
+F1s_plant <- F1s_short_summarize_twenty %>% filter(Sum_Seeds>20) %>% 
+  mutate(plantable_seeds = Sum_Seeds - 20,
+         seeds_to_plant = min(plantable_seeds, 26)
+         ) %>% 
+  arrange(desc(Sum_Seeds))
+
+F1s_plant
+
+sum(F1s_plant$seeds_to_plant)
+
+
 ```
 
 ### F2s
