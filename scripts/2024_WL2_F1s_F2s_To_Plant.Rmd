@@ -49,7 +49,13 @@ F1s_plant
 
 sum(F1s_plant$seeds_to_plant)
 
-
+F1s_plant2 <- F1s_short_summarize_twenty %>% filter(Sum_Seeds>20) %>% 
+  mutate(plantable_seeds = Sum_Seeds - 20,
+         seeds_to_plant = ifelse(plantable_seeds<26, plantable_seeds, 26) #changed this to an ifelse statement b/c the code above wasn't always giving 26 plantable seeds when possible
+         ) %>% 
+  arrange(desc(Sum_Seeds))
+F1s_plant2
+sum(F1s_plant2$seeds_to_plant)
 ```
 
 ### F2s
@@ -71,7 +77,7 @@ F2s_short_after_ripened <- F2s_short %>% filter(Year_Collected < 2024)
 F2s_short_after_ripened_summarize <- F2s_short_after_ripened %>% 
   group_by(dame_pop, sire_pop) %>% 
   summarise(Unique_Crosses=sum(!is.na(seeds_avail)),Sum_Seeds=sum(seeds_avail)) %>% 
-  mutate(Seeds_to_Plant=ifelse(Sum_Seeds <= 10, Sum_Seeds, 10)) %>% 
+  mutate(Seeds_to_Plant=ifelse(Sum_Seeds <= 40, Sum_Seeds, 40)) %>% 
   arrange(Sum_Seeds) 
 F2s_short_after_ripened_summarize
 dim(F2s_short_after_ripened_summarize) #67 types of F2s
@@ -85,9 +91,17 @@ F2s_short_after_ripened_summarize_WL2 <- F2s_short_after_ripened_summarize %>%
          WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
   filter(WL2_cross == TRUE)
 F2s_short_after_ripened_summarize_WL2
-dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s
+dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s with WL2 involved 
 sum(F2s_short_after_ripened_summarize_WL2$Sum_Seeds) #1402 total seeds available 
 sum(F2s_short_after_ripened_summarize_WL2$Seeds_to_Plant) #1180 if want 40 seeds/type, 1098 if want 30 seeds/type, 1043 if want 25 seeds/type, 974 if 20 seeds/type, 566 if 10/type
 F2s_short_after_ripened_summarize_WL2 %>% filter(Sum_Seeds < 20)
+
+F2s_short_after_ripened_summarize_TM2 <- F2s_short_after_ripened_summarize %>% 
+  mutate(TM2_mom =str_detect(dame_pop, "TM2"), 
+         TM2_dad=str_detect(sire_pop, "TM2"), 
+         TM2_cross=ifelse(TM2_mom==TRUE | TM2_dad==TRUE, TRUE, FALSE)) %>% 
+  filter(TM2_cross == TRUE)
+F2s_short_after_ripened_summarize_TM2
+dim(F2s_short_after_ripened_summarize_TM2) #33 types of F2s with TM2 involved
 ```
 
