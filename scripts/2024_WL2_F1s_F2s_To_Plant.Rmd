@@ -4,6 +4,9 @@ author: "Brandie Quarles"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+Final Design:
+-   F1s: Only types with > 20 seeds, 26 pots per type, 2 seeds per pot when possible
+-   F2s: All types available, 16 pots per type, 3 seeds per pot when possible 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -19,6 +22,30 @@ url_f2s <- "https://docs.google.com/spreadsheets/d/1bw6rzqCcrGjE5DuIe4oxC_GMPKG6
 
 ## Load Data
 
+List of all pops
+```{r}
+allpops <- c(F1s$pop.id, F2s$pop.id) %>% unique() %>%
+  str_extract_all("[A-Z]{2,3}[1-9]{0,2}") %>%
+  unlist() %>%
+  unique()
+allpops
+```
+
+### Elevation
+```{r}
+el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
+  filter(`Species Code`=="STTO") %>%
+  mutate(elevation=unlist(`Elevation (m)`)) %>%
+  select(pop.id=`Site code`, elevation) %>%
+  mutate(pop.id=str_replace(pop.id, "YOSE", "YO")) %>% 
+  filter(!is.na(pop.id))
+el
+
+el_high_low <- el %>% 
+  mutate(elevation_class=ifelse(elevation>2000, "high", "low"))
+el_high_low
+```
+
 ### F1s
 ```{r}
 F1s <- read_sheet(url_f1s,
@@ -33,7 +60,10 @@ F1s_short_summarize <- F1s_short %>% group_by(dame_pop, sire_pop) %>% summarise(
 F1s_short_summarize
 dim(F1s_short_summarize) #40 F1 types
 
-F1s_short_summarize_twenty <- F1s_short_summarize %>% filter(Sum_Seeds >= 20) %>% filter(!is.na(sire_pop)) %>% arrange(Sum_Seeds)
+F1s_short_summarize_twenty <- F1s_short_summarize %>% 
+  filter(Sum_Seeds >= 20) %>%
+  filter(!is.na(sire_pop)) %>% 
+  arrange(Sum_Seeds)
 F1s_short_summarize_twenty
 F1s_short_summarize_twenty %>% filter(Sum_Seeds==20) #13 of the 26 F1s with at least 20 seeds only have 20 seeds 
 
@@ -41,15 +71,12 @@ F1s_short_summarize_twenty %>% filter(Sum_Seeds>20) %>% arrange(desc(Sum_Seeds))
 
 F1s_plant <- F1s_short_summarize_twenty %>% filter(Sum_Seeds>20) %>% 
   mutate(plantable_seeds = Sum_Seeds - 20,
-         seeds_to_plant = min(plantable_seeds, 26)
+         pots_to_plant = ifelse(plantable_seeds<26, plantable_seeds, 26),
+         seeds_to_plant = ifelse(plantable_seeds<52, plantable_seeds, 52)
          ) %>% 
   arrange(desc(Sum_Seeds))
-
 F1s_plant
-
-sum(F1s_plant$seeds_to_plant)
-
-
+sum(F1s_plant$pots_to_plant)
 ```
 
 ### F2s
@@ -61,33 +88,113 @@ F2s <- read_sheet(url_f2s,
 head(F2s) #need to make everything a character 
 
 F2s_short <- F2s %>% 
-  select(dame_pop=`dame pop/hybrid`, dame_mf_rep=`dame mf-rep/ID`, sire_pop=`sire pop/hybrid`, sire_mf_rep=`sire mf-rep/ID`, date_crossed=`date crossed`, date_collected=`date collected`, emasc_poll=`emasulator-pollinator`, seeds_avail=`number of seed updated after fall 2023 planting`, seed_quality=`seed quality`, notes) %>% 
+  select(dame_pop=`dame pop/hybrid`, dame_mf_rep=`dame mf-rep/ID`, sire_pop=`sire pop/hybrid`,
+         sire_mf_rep=`sire mf-rep/ID`, date_crossed=`date crossed`, 
+         date_collected=`date collected`, emasc_poll=`emasulator-pollinator`, 
+         seeds_avail=`number of seed updated after fall 2023 planting`, 
+         seed_quality=`seed quality`, notes) %>% 
   filter(!is.na(dame_pop)) %>% 
-  mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected), Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
+  mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
+         Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
 head(F2s_short)
 
 F2s_short_after_ripened <- F2s_short %>% filter(Year_Collected < 2024)
 
-F2s_short_after_ripened_summarize <- F2s_short_after_ripened %>% 
+F2s_plant <- F2s_short_after_ripened %>% 
   group_by(dame_pop, sire_pop) %>% 
-  summarise(Unique_Crosses=sum(!is.na(seeds_avail)),Sum_Seeds=sum(seeds_avail)) %>% 
-  mutate(Seeds_to_Plant=ifelse(Sum_Seeds <= 10, Sum_Seeds, 10)) %>% 
+  summarise(Unique_Crosses=sum(!is.na(seeds_avail)), Sum_Seeds=sum(seeds_avail)) %>% 
+  mutate(pots_to_plant=ifelse(Sum_Seeds < 16, Sum_Seeds, 16),
+         seeds_to_plant=ifelse(Sum_Seeds < 48, Sum_Seeds, 48)) %>% 
+  mutate(dame_pop=str_replace(dame_pop, "X", "x")) %>% 
   arrange(Sum_Seeds) 
-F2s_short_after_ripened_summarize
-dim(F2s_short_after_ripened_summarize) #67 types of F2s
-sum(F2s_short_after_ripened_summarize$Sum_Seeds) #1523 total seeds available
-sum(F2s_short_after_ripened_summarize$Seeds_to_Plant) #1300 if want 40 seeds/type, 1208 if want 30 seeds/type, 1148 if want 25 seeds/type, 1074 if 20 seeds/type, 616 if 10/type
-F2s_short_after_ripened_summarize %>% filter(Sum_Seeds < 20)
+F2s_plant
+dim(F2s_plant) #67 types of F2s
+sum(F2s_plant$Sum_Seeds) #1523 total seeds available
+sum(F2s_plant$pots_to_plant) #920 pots 
 
-F2s_short_after_ripened_summarize_WL2 <- F2s_short_after_ripened_summarize %>% 
+F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>% 
   mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
          WL2_dad=str_detect(sire_pop, "WL2"), 
          WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
   filter(WL2_cross == TRUE)
-F2s_short_after_ripened_summarize_WL2
-dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s
-sum(F2s_short_after_ripened_summarize_WL2$Sum_Seeds) #1402 total seeds available 
-sum(F2s_short_after_ripened_summarize_WL2$Seeds_to_Plant) #1180 if want 40 seeds/type, 1098 if want 30 seeds/type, 1043 if want 25 seeds/type, 974 if 20 seeds/type, 566 if 10/type
-F2s_short_after_ripened_summarize_WL2 %>% filter(Sum_Seeds < 20)
+head(F2s_short_after_ripened_summarize_WL2)
+dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s with WL2 involved 
+
+F2s_short_after_ripened_summarize_TM2 <- F2s_plant %>% 
+  mutate(TM2_mom =str_detect(dame_pop, "TM2"), 
+         TM2_dad=str_detect(sire_pop, "TM2"), 
+         TM2_cross=ifelse(TM2_mom==TRUE | TM2_dad==TRUE, TRUE, FALSE)) %>% 
+  filter(TM2_cross == TRUE)
+head(F2s_short_after_ripened_summarize_TM2)
+dim(F2s_short_after_ripened_summarize_TM2) #33 types of F2s with TM2 involved
+```
+
+## Pots per planting 
+Anything that’s 100% maternal high elevation should be planted with high elevation populations (8 weeks strat) 
+Anything that 100% maternal low should be planted with low elevation populations (4 weeks strat) 
+Everything else is planted in the middle (6 weeks strat)
+
+### Parents
+```{r}
+parents <- tibble(pop.id=c("LV1", "SQ3", "WL1", "YO11", "BH", "CC", "DPR", "WV", "TM2", "WL2"), 
+                  pots_to_plant=c(21, 21, 21, 21, 21, 21, 21, 21, 98, 98))
+parents
+
+parents_elev <- left_join(parents, el_high_low) %>% arrange(elevation_class)
+parents_elev #note for UCD garden, WL1 was planted with high elevation pops 
+
+parents_elev_summary <- parents_elev %>% 
+  group_by(elevation_class) %>% 
+  summarise(Total_Pots=sum(pots_to_plant))
+parents_elev_summary #high 161, low 203
+```
+
+### F1s 
+```{r}
+el_high_low_f1s <- el_high_low %>% select(dame_pop=pop.id, elevation_class)
+F1s_dames <- F1s_plant %>% select(dame_pop)
+F1s_dames_elev <- left_join(F1s_dames, el_high_low_f1s) %>% distinct()
+F1s_dames_elev
+
+F1s_plant_elev <- left_join(F1s_dames_elev, F1s_plant) %>% arrange(elevation_class)
+F1s_plant_elev
+
+F1s_plant_elev_summary <- F1s_plant_elev %>% 
+  group_by(elevation_class) %>% 
+  summarise(Total_Pots=sum(pots_to_plant))
+F1s_plant_elev_summary #87 high, 181 low 
+```
+
+### F2s
+```{r}
+el_high_low_dame1 <- el_high_low %>% select(dame1=pop.id, dame1_elev=elevation_class)
+el_high_low_dame2 <- el_high_low %>% select(dame2=pop.id, dame2_elev=elevation_class)
+
+F2s_plant_dames <- F2s_plant %>% 
+  select(dame_pop) %>% 
+  separate(col = dame_pop,
+           into = c("dame1", "dame2"),
+           sep = " x ",
+           remove = FALSE) %>% 
+  mutate(dame2=ifelse(is.na(dame2), dame1, dame2)) %>% 
+  distinct()
+F2s_plant_dames
+
+F2s_dame1 <- left_join(F2s_plant_dames, el_high_low_dame1)
+F2s_dame2 <- left_join(F2s_plant_dames, el_high_low_dame2)
+F2s_dames_elev <- left_join(F2s_dame1, F2s_dame2) %>% 
+  mutate(dame1_elev=ifelse(dame1_elev=="low", 0, 1),
+         dame2_elev=ifelse(dame2_elev=="low", 0, 1),
+         maternal_high=(dame1_elev+dame2_elev)/2) %>% 
+  select(dame_pop, maternal_high)
+F2s_dames_elev
+
+F2s_plant_elev <- full_join(F2s_dames_elev, F2s_plant) %>% arrange(maternal_high)
+F2s_plant_elev
+
+F2s_plant_elev_summary <- F2s_plant_elev %>% 
+  group_by(maternal_high) %>% 
+  summarise(Total_Pots=sum(pots_to_plant))
+F2s_plant_elev_summary #303 high, 414 middle, 203 low 
 ```
 
