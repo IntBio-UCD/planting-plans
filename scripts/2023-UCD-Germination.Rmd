@@ -188,4 +188,17 @@ F2s %>%
 ```{r}
 F2s %>% pull(pop.id) %>% unique()
 ```
+## F1s by maternal pop
+```{r}
+F1s %>% group_by(maternal.pop) %>%
+  summarize(germination=mean(germinated.y.n), count = n()) %>%
+  arrange(germination)
+```
+
+## F2s by maternal pop
+```{r}
+F2s %>% group_by(maternal.pop) %>%
+  summarize(germination=mean(germinated.y.n), count = n()) %>%
+  arrange(germination)
+```
 
