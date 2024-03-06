@@ -22,30 +22,6 @@ url_f2s <- "https://docs.google.com/spreadsheets/d/1bw6rzqCcrGjE5DuIe4oxC_GMPKG6
 
 ## Load Data
 
-List of all pops
-```{r}
-allpops <- c(F1s$pop.id, F2s$pop.id) %>% unique() %>%
-  str_extract_all("[A-Z]{2,3}[1-9]{0,2}") %>%
-  unlist() %>%
-  unique()
-allpops
-```
-
-### Elevation
-```{r}
-el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
-  filter(`Species Code`=="STTO") %>%
-  mutate(elevation=unlist(`Elevation (m)`)) %>%
-  select(pop.id=`Site code`, elevation) %>%
-  mutate(pop.id=str_replace(pop.id, "YOSE", "YO")) %>% 
-  filter(!is.na(pop.id))
-el
-
-el_high_low <- el %>% 
-  mutate(elevation_class=ifelse(elevation>2000, "high", "low"))
-el_high_low
-```
-
 ### F1s
 ```{r}
 F1s <- read_sheet(url_f1s,
@@ -129,10 +105,26 @@ head(F2s_short_after_ripened_summarize_TM2)
 dim(F2s_short_after_ripened_summarize_TM2) #33 types of F2s with TM2 involved
 ```
 
+### Elevation
+```{r}
+el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
+  filter(`Species Code`=="STTO") %>%
+  mutate(elevation=unlist(`Elevation (m)`)) %>%
+  select(pop.id=`Site code`, elevation) %>%
+  mutate(pop.id=str_replace(pop.id, "YOSE", "YO")) %>% 
+  filter(!is.na(pop.id))
+el
+
+el_high_low <- el %>% 
+  mutate(elevation_class=ifelse(elevation>2000, "high", "low")) %>% 
+  mutate(elevation_class=ifelse(pop.id=="WL1", "mid", elevation_class))
+```
+
 ## Pots per planting 
-Anything that’s 100% maternal high elevation should be planted with high elevation populations (8 weeks strat) 
-Anything that 100% maternal low should be planted with low elevation populations (4 weeks strat) 
-Everything else is planted in the middle (6 weeks strat)
+New Plan:
+Parents: high (>2000 m) gets 8 weeks, WL1 gets 6 weeks, and rest get 4 weeks 
+F1s: WL2 mom get 8 weeks strat, everyone else gets 6 weeks 
+F2s: all maternal high get 8 weeks strat, everyone else gets 6 weeks 
 
 ### Parents
 ```{r}
@@ -146,23 +138,43 @@ parents_elev #note for UCD garden, WL1 was planted with high elevation pops
 parents_elev_summary <- parents_elev %>% 
   group_by(elevation_class) %>% 
   summarise(Total_Pots=sum(pots_to_plant))
-parents_elev_summary #high 161, low 203
+parents_elev_summary #high 161, WL1 21, low 182
+
+
+parents_elev_labels <- parents_elev %>% slice(rep(1:n(), times = pots_to_plant))
+parents_labels_germ <- parents_elev_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number()) %>% 
+  select(pop.id, Rep, elevation_class) %>% 
+  arrange(elevation_class)
+parents_labels_germ
+
+#ss_parents <- gs4_create(
+#  "parents_labels_germ",
+#  sheets = parents_labels_germ
+#)
 ```
 
 ### F1s 
 ```{r}
-el_high_low_f1s <- el_high_low %>% select(dame_pop=pop.id, elevation_class)
-F1s_dames <- F1s_plant %>% select(dame_pop)
-F1s_dames_elev <- left_join(F1s_dames, el_high_low_f1s) %>% distinct()
-F1s_dames_elev
+F1s_dames_WL2 <- F1s_plant %>% mutate(WL2_mom =str_detect(dame_pop, "WL2")) %>% arrange(desc(WL2_mom))
 
-F1s_plant_elev <- left_join(F1s_dames_elev, F1s_plant) %>% arrange(elevation_class)
-F1s_plant_elev
-
-F1s_plant_elev_summary <- F1s_plant_elev %>% 
-  group_by(elevation_class) %>% 
+F1s_dames_WL2_summary <- F1s_dames_WL2 %>% 
+  group_by(WL2_mom) %>% 
   summarise(Total_Pots=sum(pots_to_plant))
-F1s_plant_elev_summary #87 high, 181 low 
+F1s_dames_WL2_summary #9 WL2 moms, 259 others
+
+F1s_elev_labels <- F1s_dames_WL2 %>% slice(rep(1:n(), times = pots_to_plant))
+F1s_labels_germ <- F1s_elev_labels %>% 
+  unite(pop.id, dame_pop:sire_pop, sep = " x ") %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number()) %>% 
+  select(pop.id, Rep, WL2_mom) %>% 
+   arrange(desc(WL2_mom))
+F1s_labels_germ
+
+#ss_F1s <- gs4_create(
+#  "F1s_labels_germ",
+#  sheets = F1s_labels_germ
+#)
 ```
 
 ### F2s
@@ -183,8 +195,8 @@ F2s_plant_dames
 F2s_dame1 <- left_join(F2s_plant_dames, el_high_low_dame1)
 F2s_dame2 <- left_join(F2s_plant_dames, el_high_low_dame2)
 F2s_dames_elev <- left_join(F2s_dame1, F2s_dame2) %>% 
-  mutate(dame1_elev=ifelse(dame1_elev=="low", 0, 1),
-         dame2_elev=ifelse(dame2_elev=="low", 0, 1),
+  mutate(dame1_elev=ifelse(dame1_elev=="high", 1, 0),
+         dame2_elev=ifelse(dame2_elev=="high", 1, 0),
          maternal_high=(dame1_elev+dame2_elev)/2) %>% 
   select(dame_pop, maternal_high)
 F2s_dames_elev
@@ -195,6 +207,24 @@ F2s_plant_elev
 F2s_plant_elev_summary <- F2s_plant_elev %>% 
   group_by(maternal_high) %>% 
   summarise(Total_Pots=sum(pots_to_plant))
-F2s_plant_elev_summary #303 high, 414 middle, 203 low 
+F2s_plant_elev_summary #303 high, 617 other 
+
+
+F2s_elev_labels <- F2s_plant_elev %>% slice(rep(1:n(), times = pots_to_plant))
+F2s_labels_germ <- F2s_elev_labels %>% 
+  mutate(dame_pop = paste0("(", dame_pop, ")"), sire_pop = paste0("(", sire_pop, ")")) %>% 
+  unite(pop.id, c(dame_pop,sire_pop), sep = " x ") %>% 
+ group_by(pop.id) %>% mutate(Rep = row_number()) %>% 
+ select(pop.id, Rep, maternal_high) %>% 
+ arrange(desc(maternal_high))
+F2s_labels_germ
+
+#ss_F2s <- gs4_create(
+#  "F2s_labels_germ",
+#  sheets = F2s_labels_germ
+#)
 ```
+
+
+## Planting Data Sheets
 
