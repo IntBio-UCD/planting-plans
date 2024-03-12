@@ -70,6 +70,7 @@ F2s_short <- F2s %>%
          seeds_avail=`number of seed updated after fall 2023 planting`, 
          seed_quality=`seed quality`, notes) %>% 
   filter(!is.na(dame_pop)) %>% 
+  mutate(dame_pop=str_replace(dame_pop, "X", "x")) %>% 
   mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
          Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
 head(F2s_short)
@@ -81,12 +82,11 @@ F2s_plant <- F2s_short_after_ripened %>%
   summarise(Unique_Crosses=sum(!is.na(seeds_avail)), Sum_Seeds=sum(seeds_avail)) %>% 
   mutate(pots_to_plant=ifelse(Sum_Seeds < 16, Sum_Seeds, 16),
          seeds_to_plant=ifelse(Sum_Seeds < 48, Sum_Seeds, 48)) %>% 
-  mutate(dame_pop=str_replace(dame_pop, "X", "x")) %>% 
   arrange(Sum_Seeds) 
 F2s_plant
-dim(F2s_plant) #67 types of F2s
+dim(F2s_plant) #66 types of F2s
 sum(F2s_plant$Sum_Seeds) #1523 total seeds available
-sum(F2s_plant$pots_to_plant) #920 pots 
+sum(F2s_plant$pots_to_plant) #904 pots 
 
 F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>% 
   mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
@@ -94,7 +94,7 @@ F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>%
          WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
   filter(WL2_cross == TRUE)
 head(F2s_short_after_ripened_summarize_WL2)
-dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s with WL2 involved 
+dim(F2s_short_after_ripened_summarize_WL2) #61 types of F2s with WL2 involved 
 
 F2s_short_after_ripened_summarize_TM2 <- F2s_plant %>% 
   mutate(TM2_mom =str_detect(dame_pop, "TM2"), 
@@ -171,6 +171,7 @@ F1s_labels_germ <- F1s_elev_labels %>%
    arrange(desc(WL2_mom))
 F1s_labels_germ
 
+
 #ss_F1s <- gs4_create(
 #  "F1s_labels_germ",
 #  sheets = F1s_labels_germ
@@ -207,7 +208,7 @@ F2s_plant_elev
 F2s_plant_elev_summary <- F2s_plant_elev %>% 
   group_by(maternal_high) %>% 
   summarise(Total_Pots=sum(pots_to_plant))
-F2s_plant_elev_summary #303 high, 617 other 
+F2s_plant_elev_summary #303 high, 601 other 
 
 
 F2s_elev_labels <- F2s_plant_elev %>% slice(rep(1:n(), times = pots_to_plant))
@@ -225,6 +226,96 @@ F2s_labels_germ
 #)
 ```
 
+8 weeks strat = 473 pots, 5 racks 
+6 weeks strat = 897 pots, 10 racks
+4 weeks strat = 182 pots, 2 racks 
+2 weeks strat = ?
 
 ## Planting Data Sheets
+Need to know who to plant for each strat period (indivs labels) + how many seeds per pot 
+Prep
+```{r}
+F1s_plant_planting <- F1s_plant %>% 
+  unite(pop.id, dame_pop:sire_pop, sep = " x ") %>% 
+  select(pop.id, pots_to_plant, seeds_to_plant)
+F1s_labels_germ_planting <- left_join(F1s_labels_germ, F1s_plant_planting)
+head(F1s_labels_germ_planting)
+
+F2s_plant_planting <- F2s_plant %>% 
+  mutate(dame_pop = paste0("(", dame_pop, ")"), sire_pop = paste0("(", sire_pop, ")")) %>% 
+  unite(pop.id, dame_pop:sire_pop, sep = " x ") %>% 
+  select(pop.id, pots_to_plant, seeds_to_plant)
+F2s_labels_germ_planting <- left_join(F2s_labels_germ, F2s_plant_planting)
+head(F2s_labels_germ_planting)
+```
+
+8 weeks strat 
+```{r}
+parents_labels_germ_high <- parents_labels_germ %>%  
+  filter(elevation_class=="high") %>% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=ifelse(pop.id=="WL2", 294, 63)) %>%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F1s_labels_germ_WL2 <- F1s_labels_germ_planting %>% 
+  filter(WL2_mom=="TRUE") %>%  
+  mutate(Seed_per_pot=1, Total_Seeds_to_Aliquot=9) %>%
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F2s_labels_germ_high <- F2s_labels_germ_planting %>% 
+  filter(maternal_high==1.0) %>%
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %>% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==48, 3,  #3 seeds/pot when possible
+                             ifelse(Total_Seeds_to_Aliquot==32, 2,
+                                    ifelse(Total_Seeds_to_Aliquot<=16, 1, 0)))) %>% #0 is a stand in for the in-between cases that I will adjust manually 
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+  
+eight_weeks_strat <- bind_rows(parents_labels_germ_high, F1s_labels_germ_WL2, F2s_labels_germ_high) %>% 
+  arrange(Seed_per_pot, pop.id)
+
+#ss_eight <- gs4_create(
+#  "eight_weeks_strat",
+#  sheets = eight_weeks_strat
+#)
+```
+
+6 weeks strat
+```{r}
+parents_labels_germ_WL1 <- parents_labels_germ %>%  
+  filter(elevation_class=="mid") %>% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=63) %>%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F1s_labels_germ_others <- F1s_labels_germ_planting %>% 
+  filter(WL2_mom!="TRUE") %>%  
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %>% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==52, 2,
+                             ifelse(Total_Seeds_to_Aliquot<=26, 1, 0))) %>% #2 seeds/pot when possible
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F2s_labels_germ_others <- F2s_labels_germ_planting %>% 
+  filter(maternal_high!=1.0) %>% 
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %>% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==48, 3,  #3 seeds/pot when possible
+                             ifelse(Total_Seeds_to_Aliquot==32, 2,
+                                    ifelse(Total_Seeds_to_Aliquot<=16, 1, 0)))) %>% #0 is a stand in for the in-between cases that I will adjust manually 
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+
+six_weeks_strat <- bind_rows(parents_labels_germ_WL1, F1s_labels_germ_others, F2s_labels_germ_others) %>% 
+  arrange(Seed_per_pot, pop.id)
+
+#ss_six <- gs4_create(
+#  "six_weeks_strat",
+#  sheets = six_weeks_strat
+#)
+```
+
+
+4 weeks strat
+```{r}
+parents_labels_germ_low <- parents_labels_germ %>% 
+  filter(elevation_class=="low") %>% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=ifelse(pop.id=="TM2", 294, 63)) %>%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+
+#ss_four <- gs4_create(
+#  "parents_labels_germ_low",
+#  sheets = parents_labels_germ_low
+#)
+```
 
