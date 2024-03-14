@@ -71,6 +71,7 @@ F2s_short <- F2s %>%
          seed_quality=`seed quality`, notes) %>% 
   filter(!is.na(dame_pop)) %>% 
   mutate(dame_pop=str_replace(dame_pop, "X", "x")) %>% 
+  mutate(sire_pop=str_replace(sire_pop, "X", "x")) %>% 
   mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
          Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
 head(F2s_short)
@@ -84,9 +85,9 @@ F2s_plant <- F2s_short_after_ripened %>%
          seeds_to_plant=ifelse(Sum_Seeds < 48, Sum_Seeds, 48)) %>% 
   arrange(Sum_Seeds) 
 F2s_plant
-dim(F2s_plant) #66 types of F2s
+dim(F2s_plant) #63 types of F2s
 sum(F2s_plant$Sum_Seeds) #1523 total seeds available
-sum(F2s_plant$pots_to_plant) #904 pots 
+sum(F2s_plant$pots_to_plant) #861 pots 
 
 F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>% 
   mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
@@ -94,7 +95,7 @@ F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>%
          WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
   filter(WL2_cross == TRUE)
 head(F2s_short_after_ripened_summarize_WL2)
-dim(F2s_short_after_ripened_summarize_WL2) #61 types of F2s with WL2 involved 
+dim(F2s_short_after_ripened_summarize_WL2) #59 types of F2s with WL2 involved 
 
 F2s_short_after_ripened_summarize_TM2 <- F2s_plant %>% 
   mutate(TM2_mom =str_detect(dame_pop, "TM2"), 
@@ -102,7 +103,7 @@ F2s_short_after_ripened_summarize_TM2 <- F2s_plant %>%
          TM2_cross=ifelse(TM2_mom==TRUE | TM2_dad==TRUE, TRUE, FALSE)) %>% 
   filter(TM2_cross == TRUE)
 head(F2s_short_after_ripened_summarize_TM2)
-dim(F2s_short_after_ripened_summarize_TM2) #33 types of F2s with TM2 involved
+dim(F2s_short_after_ripened_summarize_TM2) #31 types of F2s with TM2 involved
 ```
 
 ### Elevation
@@ -208,7 +209,7 @@ F2s_plant_elev
 F2s_plant_elev_summary <- F2s_plant_elev %>% 
   group_by(maternal_high) %>% 
   summarise(Total_Pots=sum(pots_to_plant))
-F2s_plant_elev_summary #303 high, 601 other 
+F2s_plant_elev_summary #303 high, 558 other 
 
 
 F2s_elev_labels <- F2s_plant_elev %>% slice(rep(1:n(), times = pots_to_plant))

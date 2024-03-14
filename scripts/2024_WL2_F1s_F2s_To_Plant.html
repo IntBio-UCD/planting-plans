@@ -11,7 +11,7 @@
 
 <meta name="author" content="Brandie Quarles" />
 
-<meta name="date" content="2024-03-05" />
+<meta name="date" content="2024-03-14" />
 
 <title>F1s and F2s to Plant</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">F1s and F2s to Plant</h1>
 <h4 class="author">Brandie Quarles</h4>
-<h4 class="date">2024-03-05</h4>
+<h4 class="date">2024-03-14</h4>
 
 </div>
 
@@ -560,6 +560,8 @@ F1s_plant</code></pre>
          seeds_avail=`number of seed updated after fall 2023 planting`, 
          seed_quality=`seed quality`, notes) %&gt;% 
   filter(!is.na(dame_pop)) %&gt;% 
+  mutate(dame_pop=str_replace(dame_pop, &quot;X&quot;, &quot;x&quot;)) %&gt;% 
+  mutate(sire_pop=str_replace(sire_pop, &quot;X&quot;, &quot;x&quot;)) %&gt;% 
   mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
          Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
 head(F2s_short)</code></pre>
@@ -581,12 +583,11 @@ F2s_plant &lt;- F2s_short_after_ripened %&gt;%
   summarise(Unique_Crosses=sum(!is.na(seeds_avail)), Sum_Seeds=sum(seeds_avail)) %&gt;% 
   mutate(pots_to_plant=ifelse(Sum_Seeds &lt; 16, Sum_Seeds, 16),
          seeds_to_plant=ifelse(Sum_Seeds &lt; 48, Sum_Seeds, 48)) %&gt;% 
-  mutate(dame_pop=str_replace(dame_pop, &quot;X&quot;, &quot;x&quot;)) %&gt;% 
   arrange(Sum_Seeds) </code></pre>
 <pre><code>## `summarise()` has grouped output by &#39;dame_pop&#39;. You can override using the
 ## `.groups` argument.</code></pre>
 <pre class="r"><code>F2s_plant</code></pre>
-<pre><code>## # A tibble: 67 × 6
+<pre><code>## # A tibble: 63 × 6
 ## # Groups:   dame_pop [21]
 ##    dame_pop   sire_pop  Unique_Crosses Sum_Seeds pots_to_plant seeds_to_plant
 ##    &lt;chr&gt;      &lt;chr&gt;              &lt;int&gt;     &lt;dbl&gt;         &lt;dbl&gt;          &lt;dbl&gt;
@@ -600,13 +601,13 @@ F2s_plant &lt;- F2s_short_after_ripened %&gt;%
 ##  8 WL2 x DPR  TM2 x WL2              1         8             8              8
 ##  9 YO11 x WL2 WV x WL2               1         8             8              8
 ## 10 WL2 x CC   SQ3 x WL2              1         9             9              9
-## # ℹ 57 more rows</code></pre>
-<pre class="r"><code>dim(F2s_plant) #67 types of F2s</code></pre>
-<pre><code>## [1] 67  6</code></pre>
+## # ℹ 53 more rows</code></pre>
+<pre class="r"><code>dim(F2s_plant) #63 types of F2s</code></pre>
+<pre><code>## [1] 63  6</code></pre>
 <pre class="r"><code>sum(F2s_plant$Sum_Seeds) #1523 total seeds available</code></pre>
 <pre><code>## [1] 1523</code></pre>
-<pre class="r"><code>sum(F2s_plant$pots_to_plant) #920 pots </code></pre>
-<pre><code>## [1] 920</code></pre>
+<pre class="r"><code>sum(F2s_plant$pots_to_plant) #861 pots </code></pre>
+<pre><code>## [1] 861</code></pre>
 <pre class="r"><code>F2s_short_after_ripened_summarize_WL2 &lt;- F2s_plant %&gt;% 
   mutate(WL2_mom =str_detect(dame_pop, &quot;WL2&quot;), 
          WL2_dad=str_detect(sire_pop, &quot;WL2&quot;), 
@@ -624,8 +625,8 @@ head(F2s_short_after_ripened_summarize_WL2)</code></pre>
 ## 5 CC x TM2  WL2 x TM2              1         3             3              3
 ## 6 TM2 x WL2 DPR x WL2              1         4             4              4
 ## # ℹ 3 more variables: WL2_mom &lt;lgl&gt;, WL2_dad &lt;lgl&gt;, WL2_cross &lt;lgl&gt;</code></pre>
-<pre class="r"><code>dim(F2s_short_after_ripened_summarize_WL2) #62 types of F2s with WL2 involved </code></pre>
-<pre><code>## [1] 62  9</code></pre>
+<pre class="r"><code>dim(F2s_short_after_ripened_summarize_WL2) #59 types of F2s with WL2 involved </code></pre>
+<pre><code>## [1] 59  9</code></pre>
 <pre class="r"><code>F2s_short_after_ripened_summarize_TM2 &lt;- F2s_plant %&gt;% 
   mutate(TM2_mom =str_detect(dame_pop, &quot;TM2&quot;), 
          TM2_dad=str_detect(sire_pop, &quot;TM2&quot;), 
@@ -643,8 +644,8 @@ head(F2s_short_after_ripened_summarize_TM2)</code></pre>
 ## 5 TM2 x WL2 DPR x WL2              1         4             4              4
 ## 6 TM2 x WL2 LV1 x WL2              1         7             7              7
 ## # ℹ 3 more variables: TM2_mom &lt;lgl&gt;, TM2_dad &lt;lgl&gt;, TM2_cross &lt;lgl&gt;</code></pre>
-<pre class="r"><code>dim(F2s_short_after_ripened_summarize_TM2) #33 types of F2s with TM2 involved</code></pre>
-<pre><code>## [1] 33  9</code></pre>
+<pre class="r"><code>dim(F2s_short_after_ripened_summarize_TM2) #31 types of F2s with TM2 involved</code></pre>
+<pre><code>## [1] 31  9</code></pre>
 </div>
 <div id="elevation" class="section level3">
 <h3>Elevation</h3>
@@ -753,11 +754,10 @@ parents_labels_germ</code></pre>
 ##  9 LV1        9 high           
 ## 10 LV1       10 high           
 ## # ℹ 354 more rows</code></pre>
-<pre class="r"><code>ss_parents &lt;- gs4_create(
-  &quot;parents_labels_germ&quot;,
-  sheets = parents_labels_germ
-)</code></pre>
-<pre><code>## ✔ Creating new Sheet: &quot;parents_labels_germ&quot;.</code></pre>
+<pre class="r"><code>#ss_parents &lt;- gs4_create(
+#  &quot;parents_labels_germ&quot;,
+#  sheets = parents_labels_germ
+#)</code></pre>
 </div>
 <div id="f1s-1" class="section level3">
 <h3>F1s</h3>
@@ -794,11 +794,10 @@ F1s_labels_germ</code></pre>
 ##  9 WL2 x BH     9 TRUE   
 ## 10 BH x WL2     1 FALSE  
 ## # ℹ 258 more rows</code></pre>
-<pre class="r"><code>ss_F1s &lt;- gs4_create(
-  &quot;F1s_labels_germ&quot;,
-  sheets = F1s_labels_germ
-)</code></pre>
-<pre><code>## ✔ Creating new Sheet: &quot;F1s_labels_germ&quot;.</code></pre>
+<pre class="r"><code>#ss_F1s &lt;- gs4_create(
+#  &quot;F1s_labels_germ&quot;,
+#  sheets = F1s_labels_germ
+#)</code></pre>
 </div>
 <div id="f2s-1" class="section level3">
 <h3>F2s</h3>
@@ -813,8 +812,8 @@ F2s_plant_dames &lt;- F2s_plant %&gt;%
            remove = FALSE) %&gt;% 
   mutate(dame2=ifelse(is.na(dame2), dame1, dame2)) %&gt;% 
   distinct()</code></pre>
-<pre><code>## Warning: Expected 2 pieces. Missing pieces filled with `NA` in 12 rows [13, 20, 31, 38,
-## 39, 47, 48, 54, 57, 58, 60, 65].</code></pre>
+<pre><code>## Warning: Expected 2 pieces. Missing pieces filled with `NA` in 9 rows [19, 29, 43, 44,
+## 51, 52, 54, 57, 62].</code></pre>
 <pre class="r"><code>F2s_plant_dames</code></pre>
 <pre><code>## # A tibble: 21 × 3
 ## # Groups:   dame_pop [21]
@@ -860,31 +859,31 @@ F2s_plant_dames &lt;- F2s_plant %&gt;%
 <pre class="r"><code>F2s_plant_elev &lt;- full_join(F2s_dames_elev, F2s_plant) %&gt;% arrange(maternal_high)</code></pre>
 <pre><code>## Joining with `by = join_by(dame_pop)`</code></pre>
 <pre class="r"><code>F2s_plant_elev</code></pre>
-<pre><code>## # A tibble: 67 × 7
+<pre><code>## # A tibble: 63 × 7
 ## # Groups:   dame_pop [21]
 ##    dame_pop  maternal_high sire_pop  Unique_Crosses Sum_Seeds pots_to_plant
 ##    &lt;chr&gt;             &lt;dbl&gt; &lt;chr&gt;              &lt;int&gt;     &lt;dbl&gt;         &lt;dbl&gt;
 ##  1 WV x TM2              0 WL2 x TM2              1         1             1
 ##  2 CC x TM2              0 WL2 x TM2              1         3             3
-##  3 TM2                   0 TM2 X WL2              1        11            11
-##  4 TM2                   0 TM2 X BH               3        20            16
-##  5 TM2                   0 TM2 x BH               1        20            16
-##  6 TM2                   0 TM2 x WL2              4        74            16
-##  7 WL1 x TM2             0 WL2 x TM2              2        12            12
-##  8 BH                    0 TM2 x BH               1        20            16
-##  9 TM2 x BH              0 TM2                    4        20            16
-## 10 TM2 x BH              0 TM2 x WL2              2        20            16
-## # ℹ 57 more rows
+##  3 WL1 x TM2             0 WL2 x TM2              2        12            12
+##  4 BH                    0 TM2 x BH               1        20            16
+##  5 TM2 x BH              0 TM2                    4        20            16
+##  6 TM2 x BH              0 TM2 x WL2              2        20            16
+##  7 TM2 x BH              0 BH                     4        41            16
+##  8 DPR                   0 WL2 x DPR              2        30            16
+##  9 DPR                   0 DPR x WL2              3        33            16
+## 10 TM2                   0 TM2 x BH               4        40            16
+## # ℹ 53 more rows
 ## # ℹ 1 more variable: seeds_to_plant &lt;dbl&gt;</code></pre>
 <pre class="r"><code>F2s_plant_elev_summary &lt;- F2s_plant_elev %&gt;% 
   group_by(maternal_high) %&gt;% 
   summarise(Total_Pots=sum(pots_to_plant))
-F2s_plant_elev_summary #303 high, 617 other </code></pre>
+F2s_plant_elev_summary #303 high, 558 other </code></pre>
 <pre><code>## # A tibble: 3 × 2
 ##   maternal_high Total_Pots
 ##           &lt;dbl&gt;      &lt;dbl&gt;
-## 1           0          203
-## 2           0.5        414
+## 1           0          160
+## 2           0.5        398
 ## 3           1          303</code></pre>
 <pre class="r"><code>F2s_elev_labels &lt;- F2s_plant_elev %&gt;% slice(rep(1:n(), times = pots_to_plant))
 F2s_labels_germ &lt;- F2s_elev_labels %&gt;% 
@@ -894,8 +893,8 @@ F2s_labels_germ &lt;- F2s_elev_labels %&gt;%
  select(pop.id, Rep, maternal_high) %&gt;% 
  arrange(desc(maternal_high))
 F2s_labels_germ</code></pre>
-<pre><code>## # A tibble: 920 × 3
-## # Groups:   pop.id [66]
+<pre><code>## # A tibble: 861 × 3
+## # Groups:   pop.id [63]
 ##    pop.id                      Rep maternal_high
 ##    &lt;chr&gt;                     &lt;int&gt;         &lt;dbl&gt;
 ##  1 (LV1 x WL2) x (DPR x WL2)     1             1
@@ -908,14 +907,112 @@ F2s_labels_germ</code></pre>
 ##  8 (LV1 x WL2) x (TM2 x WL2)     6             1
 ##  9 (LV1 x WL2) x (TM2 x WL2)     7             1
 ## 10 (LV1 x WL2) x (TM2 x WL2)     8             1
-## # ℹ 910 more rows</code></pre>
-<pre class="r"><code>ss_F2s &lt;- gs4_create(
-  &quot;F2s_labels_germ&quot;,
-  sheets = F2s_labels_germ
-)</code></pre>
-<pre><code>## ✔ Creating new Sheet: &quot;F2s_labels_germ&quot;.
-## ✖ Request failed [408]. Retry 1 happens in 4.8 seconds ...</code></pre>
+## # ℹ 851 more rows</code></pre>
+<pre class="r"><code>#ss_F2s &lt;- gs4_create(
+#  &quot;F2s_labels_germ&quot;,
+#  sheets = F2s_labels_germ
+#)</code></pre>
+<p>8 weeks strat = 473 pots, 5 racks 6 weeks strat = 897 pots, 10 racks
+4 weeks strat = 182 pots, 2 racks 2 weeks strat = ?</p>
 </div>
+</div>
+<div id="planting-data-sheets" class="section level2">
+<h2>Planting Data Sheets</h2>
+<p>Need to know who to plant for each strat period (indivs labels) + how
+many seeds per pot Prep</p>
+<pre class="r"><code>F1s_plant_planting &lt;- F1s_plant %&gt;% 
+  unite(pop.id, dame_pop:sire_pop, sep = &quot; x &quot;) %&gt;% 
+  select(pop.id, pots_to_plant, seeds_to_plant)
+F1s_labels_germ_planting &lt;- left_join(F1s_labels_germ, F1s_plant_planting)</code></pre>
+<pre><code>## Joining with `by = join_by(pop.id)`</code></pre>
+<pre class="r"><code>head(F1s_labels_germ_planting)</code></pre>
+<pre><code>## # A tibble: 6 × 5
+## # Groups:   pop.id [1]
+##   pop.id     Rep WL2_mom pots_to_plant seeds_to_plant
+##   &lt;chr&gt;    &lt;int&gt; &lt;lgl&gt;           &lt;dbl&gt;          &lt;dbl&gt;
+## 1 WL2 x BH     1 TRUE                9              9
+## 2 WL2 x BH     2 TRUE                9              9
+## 3 WL2 x BH     3 TRUE                9              9
+## 4 WL2 x BH     4 TRUE                9              9
+## 5 WL2 x BH     5 TRUE                9              9
+## 6 WL2 x BH     6 TRUE                9              9</code></pre>
+<pre class="r"><code>F2s_plant_planting &lt;- F2s_plant %&gt;% 
+  mutate(dame_pop = paste0(&quot;(&quot;, dame_pop, &quot;)&quot;), sire_pop = paste0(&quot;(&quot;, sire_pop, &quot;)&quot;)) %&gt;% 
+  unite(pop.id, dame_pop:sire_pop, sep = &quot; x &quot;) %&gt;% 
+  select(pop.id, pots_to_plant, seeds_to_plant)
+F2s_labels_germ_planting &lt;- left_join(F2s_labels_germ, F2s_plant_planting)</code></pre>
+<pre><code>## Joining with `by = join_by(pop.id)`</code></pre>
+<pre class="r"><code>head(F2s_labels_germ_planting)</code></pre>
+<pre><code>## # A tibble: 6 × 5
+## # Groups:   pop.id [2]
+##   pop.id                      Rep maternal_high pots_to_plant seeds_to_plant
+##   &lt;chr&gt;                     &lt;int&gt;         &lt;dbl&gt;         &lt;dbl&gt;          &lt;dbl&gt;
+## 1 (LV1 x WL2) x (DPR x WL2)     1             1             2              2
+## 2 (LV1 x WL2) x (DPR x WL2)     2             1             2              2
+## 3 (LV1 x WL2) x (TM2 x WL2)     1             1            13             13
+## 4 (LV1 x WL2) x (TM2 x WL2)     2             1            13             13
+## 5 (LV1 x WL2) x (TM2 x WL2)     3             1            13             13
+## 6 (LV1 x WL2) x (TM2 x WL2)     4             1            13             13</code></pre>
+<p>8 weeks strat</p>
+<pre class="r"><code>parents_labels_germ_high &lt;- parents_labels_germ %&gt;%  
+  filter(elevation_class==&quot;high&quot;) %&gt;% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=ifelse(pop.id==&quot;WL2&quot;, 294, 63)) %&gt;%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F1s_labels_germ_WL2 &lt;- F1s_labels_germ_planting %&gt;% 
+  filter(WL2_mom==&quot;TRUE&quot;) %&gt;%  
+  mutate(Seed_per_pot=1, Total_Seeds_to_Aliquot=9) %&gt;%
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F2s_labels_germ_high &lt;- F2s_labels_germ_planting %&gt;% 
+  filter(maternal_high==1.0) %&gt;%
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %&gt;% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==48, 3,  #3 seeds/pot when possible
+                             ifelse(Total_Seeds_to_Aliquot==32, 2,
+                                    ifelse(Total_Seeds_to_Aliquot&lt;=16, 1, 0)))) %&gt;% #0 is a stand in for the in-between cases that I will adjust manually 
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+  
+eight_weeks_strat &lt;- bind_rows(parents_labels_germ_high, F1s_labels_germ_WL2, F2s_labels_germ_high) %&gt;% 
+  arrange(Seed_per_pot, pop.id)
+
+#ss_eight &lt;- gs4_create(
+#  &quot;eight_weeks_strat&quot;,
+#  sheets = eight_weeks_strat
+#)</code></pre>
+<p>6 weeks strat</p>
+<pre class="r"><code>parents_labels_germ_WL1 &lt;- parents_labels_germ %&gt;%  
+  filter(elevation_class==&quot;mid&quot;) %&gt;% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=63) %&gt;%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F1s_labels_germ_others &lt;- F1s_labels_germ_planting %&gt;% 
+  filter(WL2_mom!=&quot;TRUE&quot;) %&gt;%  
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %&gt;% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==52, 2,
+                             ifelse(Total_Seeds_to_Aliquot&lt;=26, 1, 0))) %&gt;% #2 seeds/pot when possible
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+F2s_labels_germ_others &lt;- F2s_labels_germ_planting %&gt;% 
+  filter(maternal_high!=1.0) %&gt;% 
+  rename(Total_Seeds_to_Aliquot=seeds_to_plant) %&gt;% 
+  mutate(Seed_per_pot=ifelse(Total_Seeds_to_Aliquot==48, 3,  #3 seeds/pot when possible
+                             ifelse(Total_Seeds_to_Aliquot==32, 2,
+                                    ifelse(Total_Seeds_to_Aliquot&lt;=16, 1, 0)))) %&gt;% #0 is a stand in for the in-between cases that I will adjust manually 
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+
+six_weeks_strat &lt;- bind_rows(parents_labels_germ_WL1, F1s_labels_germ_others, F2s_labels_germ_others) %&gt;% 
+  arrange(Seed_per_pot, pop.id)
+
+#ss_six &lt;- gs4_create(
+#  &quot;six_weeks_strat&quot;,
+#  sheets = six_weeks_strat
+#)</code></pre>
+<p>4 weeks strat</p>
+<pre class="r"><code>parents_labels_germ_low &lt;- parents_labels_germ %&gt;% 
+  filter(elevation_class==&quot;low&quot;) %&gt;% 
+  mutate(Seed_per_pot=3, Total_Seeds_to_Aliquot=ifelse(pop.id==&quot;TM2&quot;, 294, 63)) %&gt;%  #3 seeds/pot
+  select(pop.id, Rep, Seed_per_pot, Total_Seeds_to_Aliquot)
+
+#ss_four &lt;- gs4_create(
+#  &quot;parents_labels_germ_low&quot;,
+#  sheets = parents_labels_germ_low
+#)</code></pre>
 </div>
 
 
