@@ -448,18 +448,7 @@ Fill in the blanks..
 # germinated
 ```
 
-Write it out
-```{r}
-# germinated %>% arrange(pop.id, mf, rep) %>%
-#   select(pop.id, mf, rep, block, row, column, everything() ) %>% 
-#   write_sheet(popsheet,
-#               sheet="Buffer New Bed Map")
 
-germinated %>% arrange(pop.id, rep) %>%
-  select(pop.id, rep, block, row, column, everything() ) %>%
-  write_sheet(popsheet,
-              sheet="Buffer New Bed Map")
-```
 
 
 
@@ -514,7 +503,7 @@ germinated %>% arrange(pop.id, rep) %>%
 
 ## combine bed map and field map
 
-reverse positions for even beds and then combine
+first get block rows correct and write to gsheets
 ```{r}
 germinated <- germinated %>%
   ungroup() %>%
@@ -524,6 +513,20 @@ germinated <- germinated %>%
   mutate(blockrow=as.numeric(as.factor(blockrow))) %>%
   ungroup()
 
+
+# germinated %>% arrange(pop.id, mf, rep) %>%
+#   select(pop.id, mf, rep, block, row, column, everything() ) %>% 
+#   write_sheet(popsheet,
+#               sheet="Buffer New Bed Map")
+
+germinated %>% arrange(rack, unique.ID) %>%
+  select(rack, unique.ID, pop.id, rep, block, blockrow, blockcolumn ) %>%
+  write_sheet(popsheet,
+              sheet="Randomization Map")
+```
+
+
+```{r}
 plan3 <- plan3 %>%
   ungroup() %>%
   arrange(bedcol, row, column) %>%
@@ -550,6 +553,13 @@ plan3_plants <- plan3_plants %>%
     colorblock=ifelse(status=="available" & pop.id=="buffer", "buffer", colorblock))
 
 plan3_plants
+
+#Write it out
+
+plan3_plants %>% arrange(pop.id, rep) %>%
+  select(pop.id, rep, everything() ) %>%
+  write_sheet(popsheet,
+              sheet="Buffer New Bed Map")
 ```
 
 
