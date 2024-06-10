@@ -16,6 +16,13 @@ is.even <- function(x) x%%2 == 0
 
 popsheet <- "https://docs.google.com/spreadsheets/d/1EhkPTCMpy_hIz2yROdXNtTdh8ljkHjCHnTPdML49MuM"
 ```
+
+## IMPORTANT
+ Snaking blocks through the beds really should be done but it is trick to coordinate with the blocked positions from the field.
+ Probably need a new strategy of adding "germinated" plants to the plan.  Like arrange the plan3 df in
+ the correct order with the snaking, and then pull in the germinated plants, possible one at a time to fill it up 
+ in the correct order.  Didn't happen for 2024.
+
 ## get germination data
 
 __Note: be sure to check the checkbox to grant access on the webpage that opens when you run the code below__
@@ -541,6 +548,10 @@ plan3_plants <- full_join(plan3, germinated)
 #   mutate(across(.cols=block:rep, .fns= ~ ifelse(bedcol%%2==0, rev(.x), .x))) %>%
 #   ungroup()
 
+# Note: the above really should be done but it is trick to coordinate with the blocked positions from the field.
+# Probably need a new strategy of adding "germinated" plants to the plan.  Like arrange the plan3 df in
+# the correct order with the snaking, and then pull in the germinated plants, possible one at a time to fill it up 
+# in the correct order.  Didn't happen for 2024.
 
 # set up labels
 plan3_plants <- plan3_plants %>%
