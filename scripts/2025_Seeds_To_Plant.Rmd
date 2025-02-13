@@ -1,0 +1,143 @@
+---
+title: "2025_Seeds_To_Plant"
+author: "Brandie QC"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+```{r}
+library(tidyverse)
+library(googlesheets4)
+url_f1s <- "https://docs.google.com/spreadsheets/d/1t5X39iisjTCknwkyNLs8Q7bmiKYkmkWtPZbpj3Ce4N8/edit#gid=709784644"
+url_f2s <- "https://docs.google.com/spreadsheets/d/1bw6rzqCcrGjE5DuIe4oxC_GMPKG66nHHNyT_iY5umBQ/edit#gid=729112464"
+url_f1s_2024_update <- "https://docs.google.com/spreadsheets/d/1W9sGeCHn3l0zRb8bdsQPy6QHrEHa2Tb0nnAh_SYz8i8/edit?gid=238525499#gid=238525499"
+```
+
+## Load Data
+
+### F1s
+```{r}
+F1s <- read_sheet(url_f1s,
+                  sheet = "Collected fruits list F1 seed",
+                  na=c("NA", "", "unknown")) 
+head(F1s)
+
+F1s_short <- F1s %>% select(dame_pop=`dame pop`, dame_mf_rep=`dame mf-rep`, sire_pop=`sire pop`, sire_mf_rep=`sire mf-rep`, date_crossed=`date crossed`, date_collected=`date collected`, seeds_avail=`number of seed updated after fall 2023 planting`, seed_quality=`seed quality`, notes)
+head(F1s_short)
+```
+
+### F1s Update
+```{r}
+F1s_update <- read_sheet(url_f1s_2024_update,
+                  sheet = "Collected fruits F2 seed",
+                  na=c("NA", "", "unknown")) %>% 
+  filter(str_detect(notes, "F1"))
+head(F1s_update)
+dim(F1s_update) #102 F1s in this dataframe
+summary(F1s_update)
+F1s_update %>% filter(!is.na(`...15`))
+
+F1s_update_short <- F1s_update %>% 
+  select(dame_pop=`dame pop/hybrid`, dame_mf_rep=`dame mf-rep/ID`, sire_pop=`sire pop/hybrid`, sire_mf_rep=`sire mf-rep/ID`, emasc_poll=`emasulator-pollinator`, date_crossed=`date crossed`, date_collected=`date collected`, seeds_avail_2024=`number of seed updated after spring 2024 planting`, duplicate=`...15`) %>% 
+  mutate(date_crossed=ymd(date_crossed),
+         date_collected=ymd(date_collected)) 
+   
+#correct the year (F1s not made after April 2023):
+F1s_update_short_2023 <- F1s_update_short %>% filter(date_crossed<"2023-05-01")
+F1s_update_short_2022 <- F1s_update_short %>% filter(date_crossed>"2023-05-01") %>%
+  mutate(date_crossed=str_replace(date_crossed, "2023", "2022")) %>% 
+  mutate(date_collected=str_replace(date_collected, "2023", "2022")) %>% 
+  mutate(date_crossed=ymd(date_crossed),
+         date_collected=ymd(date_collected))
+F1s_update_short_year_corrected <- bind_rows(F1s_update_short_2022, F1s_update_short_2023)
+```
+
+### F1s Merge
+```{r}
+F1s_all <- full_join(F1s_short, F1s_update_short_year_corrected) 
+#Warning: Detected an unexpected many-to-many relationship between `x` and `y`.
+#Some merge issues, should check this
+
+F1s_all %>% filter(!is.na(duplicate))
+F1s_all %>% filter(is.na(seeds_avail))
+F1s_all %>% filter(dame_pop=="WL2", sire_pop=="BH")
+F1s_all %>% filter(dame_pop=="BH", sire_pop=="WL2")
+
+#ignoring merge issues for now
+F1s_plant <- F1s_all %>% 
+  mutate(seeds_avail_combined=if_else(is.na(seeds_avail_2024), seeds_avail, seeds_avail_2024)) %>% 
+  group_by(dame_pop, sire_pop) %>% 
+  summarise(Unique_Crosses=sum(!is.na(seeds_avail)), Sum_Seeds=sum(seeds_avail_combined)) %>% 
+  arrange(Sum_Seeds) 
+#F1s_plant
+dim(F1s_plant) #40 types of F1s
+sum(F1s_plant$Sum_Seeds) #955 total seeds available
+#sum(F1s_plant$pots_to_plant) 
+
+F1s_plant_summarize_WL2 <- F1s_plant %>% 
+  mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
+         WL2_dad=str_detect(sire_pop, "WL2"), 
+         WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
+  filter(WL2_cross == TRUE) %>% 
+  filter(Sum_Seeds>0) %>% 
+  filter(!is.na(sire_pop)) %>% 
+  select(dame_pop:Sum_Seeds, WL2_cross) 
+head(F1s_plant_summarize_WL2)
+dim(F1s_plant_summarize_WL2) #18 types of F1s with WL2 involved 
+sum(F1s_plant_summarize_WL2$Sum_Seeds) #403 WL2 F1 seeds 
+```
+
+
+### F2s
+```{r}
+F2s <- read_sheet(url_f2s,
+                  sheet = "Collected fruits F2 seed",
+                  #col_types=cols(.default=col_character()), #force all columns to be character
+                  na=c("NA", "")) 
+head(F2s) #need to make everything a character 
+
+F2s_short <- F2s %>% 
+  select(dame_pop=`dame pop/hybrid`, dame_mf_rep=`dame mf-rep/ID`, sire_pop=`sire pop/hybrid`,
+         sire_mf_rep=`sire mf-rep/ID`, date_crossed=`date crossed`, 
+         date_collected=`date collected`, emasc_poll=`emasulator-pollinator`, 
+         seeds_avail=`number of seed updated after winter 2024 crossing planting`, 
+         seed_quality=`seed quality`, notes) %>% 
+  filter(!is.na(dame_pop)) %>% 
+  mutate(dame_pop=str_replace(dame_pop, "X", "x")) %>% 
+  mutate(sire_pop=str_replace(sire_pop, "X", "x")) %>% 
+  mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
+        Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
+head(F2s_short)
+
+F2s_short_after_ripened <- F2s_short %>% filter(Year_Collected < 2025)
+
+F2s_plant <- F2s_short_after_ripened %>% 
+  group_by(dame_pop, sire_pop) %>% 
+  summarise(Unique_Crosses=sum(!is.na(seeds_avail)), Sum_Seeds=sum(seeds_avail)) %>% 
+  #mutate(pots_to_plant=ifelse(Sum_Seeds < 16, Sum_Seeds, 16),
+     #    seeds_to_plant=ifelse(Sum_Seeds < 48, Sum_Seeds, 48)) %>% 
+  arrange(Sum_Seeds) 
+#F2s_plant
+dim(F2s_plant) #128 types of F2s
+sum(F2s_plant$Sum_Seeds) #2941 total seeds available
+#sum(F2s_plant$pots_to_plant) 
+
+F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>% 
+  mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
+         WL2_dad=str_detect(sire_pop, "WL2"), 
+         WL2_cross=ifelse(WL2_mom==TRUE | WL2_dad==TRUE, TRUE, FALSE)) %>% 
+  mutate(Cross_Type=if_else(sire_pop=="WL2", "BC1", "Other_F2")) %>% 
+  filter(WL2_cross == TRUE) %>% 
+  filter(Sum_Seeds>0) %>% 
+  select(dame_pop:Sum_Seeds, WL2_cross, Cross_Type) %>% 
+  arrange(Cross_Type)
+head(F2s_short_after_ripened_summarize_WL2)
+dim(F2s_short_after_ripened_summarize_WL2) #48 types of F2s with WL2 involved 
+F2s_short_after_ripened_summarize_WL2 %>% filter(Cross_Type=="BC1") #11 BC1s with seeds available 
+```
+
