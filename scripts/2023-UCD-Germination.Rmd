@@ -116,6 +116,21 @@ F1s %>%
   summarize(avg.germ = mean(germinated.y.n))
 ```
 
+list all F1s
+```{r}
+F1s %>% filter(!duplicated(pop.id)) %>% arrange(pop.id)
+```
+
+make a table of crosses.  "00" = low, low.  "10" = maternal high, paternal low, etc.
+```{r}
+F1s %>% filter(!duplicated(pop.id)) %>% 
+  mutate(elev.combined = str_c(maternal.high, paternal.high)) %>%
+  mutate(maternal.pop = str_c("Maternal_", maternal.pop)) %>%
+  select(maternal.pop, paternal.pop, elev.combined) %>%
+  pivot_wider(names_from = paternal.pop, values_from = elev.combined, values_fill = "missing", names_prefix = "Paternal_")
+``` 
+
+
 ```{r}
 F1.m1 <- brm(germinated.y.n ~ maternal.high * paternal.high,
              prior = set_prior("normal(0,4)"),

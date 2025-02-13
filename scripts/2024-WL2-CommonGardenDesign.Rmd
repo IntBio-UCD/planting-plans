@@ -1,0 +1,639 @@
+---
+title: "Common Garden Design"
+output: html_notebook
+---
+
+## Intro
+
+Determine randomization strategy and plant placing for 2024 Wrights Lake 2 Planting
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(ggforce)
+
+is.even <- function(x) x%%2 == 0
+
+popsheet <- "https://docs.google.com/spreadsheets/d/1EhkPTCMpy_hIz2yROdXNtTdh8ljkHjCHnTPdML49MuM"
+```
+
+## IMPORTANT
+ Snaking blocks through the beds really should be done but it is trick to coordinate with the blocked positions from the field.
+ Probably need a new strategy of adding "germinated" plants to the plan.  Like arrange the plan3 df in
+ the correct order with the snaking, and then pull in the germinated plants, possible one at a time to fill it up 
+ in the correct order.  Didn't happen for 2024.
+
+## get germination data
+
+__Note: be sure to check the checkbox to grant access on the webpage that opens when you run the code below__
+
+parents
+```{r}
+parents <- read_sheet(popsheet, 
+                      sheet = "parents_labels_germ",
+                      na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, rack, pop.id, rep = Rep)
+parents
+```
+
+F1s
+```{r}
+F1s <- read_sheet(popsheet, 
+                  sheet = "F1s_labels_germ",
+                  na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, rack, pop.id, rep=Rep)
+F1s
+```
+
+F2s
+```{r}
+F2s <- read_sheet(popsheet, 
+                  sheet = "F2s_labels_germ",
+                  na=c("NA", "")
+) %>% 
+  filter(germinated.y.n == 1) %>%
+  select(unique.ID, rack, pop.id, rep=Rep)
+F2s
+```
+
+
+```{r}
+# extra plants
+# extra <- read_sheet(url, 
+#                     sheet = "extra plants",
+#                     na=c("NA", "")
+# )  %>%
+#   mutate(across(.cols= c(`dame-mf`, `sire-mf`), .fns = str_remove, "( |-)[^)]*$" ),
+#          pop.id = str_c(`dame-mf`, " x ", `sire-mf` ),
+#          unique.ID=seq(from=2001, length.out=n()),
+#          rack = NaN) %>%
+#    select(-`dame-mf`, -`sire-mf`, rep)
+# 
+# extra
+```
+
+```{r}
+#combined <- bind_rows(parents, F1s, F2s, extra)
+germinated <- bind_rows(parents, F1s, F2s)
+germinated
+```
+
+## assign blocks to germinated
+
+get a histogram of rep count
+
+```{r}
+germinated %>%
+  group_by(pop.id) %>%
+  summarize(n=n()) %>%
+  ggplot(aes(x=n)) +
+  geom_histogram(binwidth = 1)
+```
+
+```{r}
+germinated %>%
+  group_by(pop.id) %>%
+  summarize(n=n()) %>%
+  arrange(n)
+```
+
+A bit challenging because for pops with few reps total we should be careful to distribute the pops across the blocks.  Also different max rep sizes: 16 for F2s, 26 for at least a couple of F1s.
+
+Will go for 16 blocks total.  That will be one rep per block for fully germinated F2s.
+
+I think one way this can work is to arrange by pops and mfs and then assign a randomized set of block labels to it.
+
+
+```{r}
+#terminology with "germ" prefix is a leftover from UCD2022 when we planted both germinated and ungerminated seed.
+
+nblocks <- 16
+
+germblocks <- LETTERS[1:nblocks]
+
+germreps <- ceiling(nrow(germinated) / length(germblocks) ) # number of times we have to assign blocks
+
+germinated$block <- rep(germblocks, length.out=nrow(germinated))
+
+#for low rep mfs, randomize all mfs in the pop that have have < nblocks
+set.seed(888)
+germinated_low_extra_rep <- germinated %>%
+ # group_by(pop.id, mf) %>%
+  group_by(pop.id) %>%
+  mutate(reps=n()) %>%
+  filter(reps < 16 | rep > 16) %>% # because nblocks represents full replication.  Pull pops with less than nblocks reps and pull extra reps from those with > nblocks
+  group_by(pop.id) %>%
+  mutate(block= {map(1:ceiling(n()/nblocks), ~ sample(germblocks)) %>% #sampling without replacement 1 block at a time helps with even distribution across blocks.
+      unlist() %>% magrittr::extract(1:n())}, # clean up last rep
+  ) %>%
+  ungroup() 
+
+#For high rep mfs, just use the sequentially assigned blocks
+germinated_fullrep <- germinated %>%
+  #group_by(pop.id, mf) %>%
+  group_by(pop.id) %>%
+  mutate(reps=n()) %>%
+  filter(reps >= nblocks, rep < nblocks+1) %>% #get those plants corresponding to full germination but not extra
+  ungroup()
+
+germinated <- bind_rows(germinated_low_extra_rep, germinated_fullrep) %>% 
+  #arrange(pop.id, mf)
+  arrange(pop.id)
+
+germinated  
+```
+reality check distribution across mfs
+```{r}
+# germinated %>%
+#   pivot_wider(id_cols = c(pop.id, mf), names_from = block, values_from = `germinated?`, values_fill = 0, values_fn = sum)
+```
+
+reality check distribution across pop.ids
+```{r}
+germinated %>%
+  pivot_wider(id_cols = pop.id, names_from = block, values_from = reps, values_fill = 0, values_fn = sum) %>%
+  relocate(germblocks)
+```
+
+plants per block:
+```{r}
+germinated %>%
+  group_by(block) %>%
+  summarise(n=n()) %>% arrange(n)
+```
+
+## planting grid
+
+Plot is trapezoidal.  wide edges are 20m and 16.5m.  narrow are 15m and 7.5m .
+
+__numbers below updated to match more precise field measurements__
+
+Try creating rectangular grid and then use blanks to narrow it.
+
+Create grid
+```{r}
+stagger <- TRUE
+buffer.beds <- 0
+buffer.rows <- 2 # on each edge of each bed
+exp.beds <- 11
+beds <- letters[1:(buffer.beds+exp.beds)]
+columns <- 4 # per bed
+rows <- 63 # four of which are buffers
+plants <- length(beds) * columns * rows
+bedwidth <- 90 # cm
+furrow <- 100 #cm
+size <- 25 # plant diameter
+radius <- size/2 
+
+plan3 <- expand_grid(bed=beds,
+                     column=1:columns,
+                     row=1:rows,
+                     radius=radius)
+
+plan3 <- plan3 %>%
+  mutate(plantedcol=(match(bed, letters)-1)*4 + column,
+         bedcol = floor((match(bed, letters)-1) + 1   )) 
+
+plan3
+```
+
+add positions
+```{r}
+if (stagger) {
+  column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
+  plan3 <- plan3 %>%
+    mutate(y_pos=ifelse(is.even(column),
+                        row*size, 
+                        row*size-radius),
+           x_pos=ifelse(column==1,
+                        radius+(bedcol-1)*(bedwidth+furrow),
+                        radius+(column-1)*column_offset+(bedcol-1)*(bedwidth+furrow)))
+} else {
+  plan3 <- plan3 %>%
+    mutate(y_pos=row*size,
+           x_pos=bedcol*(bedwidth+furrow))
+}
+plan3
+```
+
+add indicator for whether or not a position is available and inbounds 
+
+```{r}
+bedrows   <- c(63, 61, 60, 59, 53, 47, 45, 34, 24, 20, 16)
+
+plan3 <- plan3 %>%
+  mutate(status=ifelse(row <= bedrows[bedcol], "available", "out-of-bounds"))
+
+# eliminate some beds for 2024 because we have fewer plants
+
+plan3 <- plan3 %>%
+  mutate(status=ifelse(str_detect(bed, "[abjk]"), "out-of-bounds", status))
+
+# block out tree position (approx)
+plan3 <- plan3 %>%
+  mutate(status=ifelse(bedcol == 5 & row > bedrows[5] -23 & row <= bedrows[5]-13, "out-of-bounds", status),
+         status=ifelse(bedcol == 6 & row > bedrows[6] -19 & row <= bedrows[6]-9, "out-of-bounds", status)
+         )
+
+# block out positions with rocks
+
+rocks <- tribble(~bed, ~column, ~row,
+                 "a", 1, 44,
+                 "a", 2, 44,
+                 "a", 3, 45,
+                 "a", 3, 45,
+                 "a", 2, 48,
+                 "a", 4, 48,
+                 "b", 1, 35,
+                 "c", 4, 3,
+                 "c", 4, 4,
+                 "c", 1, 9,
+                 "c", 3, 26,
+                 "c", 4, 26,
+                 "c", 3, 27,
+                 "c", 4, 27,
+                 "c", 1, 33,
+                 "c", 3, 45,
+                 "c", 3, 46,
+                 "d", 2, 5,
+                 "d", 1, 6,
+                 "d", 3, 6,
+                 "d", 4, 6,
+                 "d", 1, 7,
+                 "d", 2, 7,
+                 "d", 4, 7,
+                 "d", 2, 8,
+                 "d", 1, 12,
+                 "d", 2, 34,
+                 "d", 3, 37,
+                 "e", 1, 6,
+                 "e", 2, 9,
+                 "e", 2, 13,
+                 "e", 4, 15,
+                 "e", 4, 16,
+                 "e", 1, 30,
+                 "e", 2, 30,
+                 "e", 3, 30,
+                 "e", 4, 30,
+                 "f", 2, 5,
+                 "f", 3, 6,
+                 "f", 4, 17,
+                 "f", 4, 18,
+                 "f", 2, 40,
+                 "g", 3, 23,
+                 "g", 4, 22,
+                 "g", 4, 23,
+                 "i", 1, 3,
+                 "i", 3, 4,
+                 "i", 4, 5,
+                 "k", 3, 5,
+                 )
+
+rocks <- bind_rows(rocks,
+  tibble(
+    bed="h", 
+    column = c(rep(1,7),
+                rep(2,3),
+                rep(3, 6),
+                rep(4, 3)),
+    row = c(9:12, 14:16,
+            7, 14, 16,
+            4, 5, 7, 14, 16, 17,
+            11, 12, 13)
+  )
+) 
+
+rocks <- rocks %>% mutate(new_status="out-of-bounds") %>% arrange(bed, row, column)
+
+plan3 <- left_join(plan3, rocks) %>% 
+  mutate(status = ifelse(is.na(new_status), status, new_status)) %>%
+  select(-new_status)
+
+plan3
+```
+
+Get 2023 plants that are still alive
+```{r, warning=FALSE}
+survey <- read_sheet("https://docs.google.com/spreadsheets/d/1cJE-tR3v4OA5rurcnFU5f1MgtEbxECSre5nzRiVN0-w", na = c("", "NA"),
+                     col_types = "ccicciicc") %>%
+  filter(str_detect(death.date, "[ABC]"))
+```
+
+
+```{r}
+survey <- survey %>%
+  select(bed, column=`bed- col`, row=`bed- row`)  %>%
+  mutate(bed = tolower(bed),
+         new_status="2023-survivor",
+         column=case_match(column,
+                        "A" ~ 1,
+                        "B" ~ 2,
+                        "C" ~ 3,
+                        "D" ~ 4
+                        ))
+
+plan3 <- left_join(plan3, survey) %>%
+  mutate(status = ifelse(is.na(new_status), status, new_status)) %>%
+  select(-new_status)
+```
+
+Get 2023 TM2 plants that fruited
+
+```{r}
+annual_census_2023 <- read_csv("~/Library/CloudStorage/GoogleDrive-jnmaloof@ucdavis.edu/Shared drives/IntBioTeam/Common Gardens/WL2_2023/CorrectedCSVs/WL2_annual_census_20231027_corrected.csv", guess_max = 2000) %>%
+  filter(pop=="TM2", num.fruit>0) %>%
+  select(bed, column=`bed-col`, row=`bed-row`)  %>%
+  mutate(bed = tolower(bed),
+         new_status="2023-TM2-fruit",
+         column=case_match(column,
+                        "A" ~ 1,
+                        "B" ~ 2,
+                        "C" ~ 3,
+                        "D" ~ 4
+                        ))
+
+plan3 <- left_join(plan3, annual_census_2023) %>%
+  mutate(status = ifelse(is.na(new_status), status, new_status)) %>% 
+  select(-new_status)
+
+``` 
+Add buffers at the beginning and end of each bed
+```{r}
+plan3 <- plan3 %>%
+  
+  #top buffers:
+  mutate(buffer=(row<=3 & str_detect(bed, "[c-h]")) | (row <=2 & str_detect(bed, "i")), # if you want different number of buffers in last row
+
+  #bottom buffers
+         buffer=ifelse(row > (bedrows[bedcol]-2) & row <= bedrows[bedcol] & str_detect(bed, "[c-i]"), TRUE, buffer),
+         status=ifelse(buffer, "buffer", status)
+  )
+```
+
+
+
+Plot it
+```{r, fig.width=12, eval=TRUE}
+
+plan3 %>%
+  ggplot(aes(x0=x_pos, y0=y_pos, r=radius, fill=status)) +
+  geom_circle(alpha=.75) + 
+  scale_fill_manual(values=c("out-of-bounds"="grey40", "available"="lightgreen", "2023-survivor"="blue", "2023-TM2-fruit"="magenta", "buffer"="yellow")) +
+  coord_equal() + 
+  #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
+  theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
+  xlab("position (cm)") + ylab("position (cm)") +
+  scale_y_reverse() +
+  ggtitle(str_c("Total available positions = ", sum(plan3$status=="available")))
+
+ggsave("../output/2024-WL2-FieldPlan.jpeg", width = 10, height = 6)
+```
+
+Position blocks in the available spots
+```{r}
+blocksizes <- germinated %>%
+  group_by(block) %>%
+  summarise(n=n()) %>%
+  mutate(n=n+4) # a buffer row between blocks
+
+blocks <-rep(blocksizes$block, time=blocksizes$n)
+
+avail <- plan3 %>%
+  filter(status=="available") %>%
+  arrange(bed, row, column) %>%
+  magrittr::extract(1:length(blocks),) %>%
+  mutate(block=blocks) %>%
+  group_by(block) %>%
+  mutate(block.id=str_c(block, str_pad(1:n(), width = 2, pad = "0"))) %>% 
+  ungroup()
+
+
+```
+
+
+## Assign Plants
+
+### germinated
+
+```{r}
+set.seed(999)
+
+germinated <- germinated %>% 
+  group_by(block) %>%
+  slice_sample(n=nrow(.)) %>% # randomize position within blocks
+  mutate(block.id=str_c(block, str_pad(1:n(), width = 2, pad = "0"))) %>%
+  ungroup() %>%
+  arrange(block.id) %>%
+  select(-reps)
+
+germinated <- left_join(avail, germinated)
+
+germinated  %>% arrange(block, row, column) %>%
+  select(block, row, column, block.id, everything())
+
+germinated  %>% arrange(pop.id) %>%# confirm different positions per block
+  select(block, bed, row, column, pop.id)
+```
+
+
+
+Fill in the blanks..
+```{r}
+# germ.fill <- germinated %>%
+#   group_by(block) %>%
+# #  expand(row=1:max(row), column) #no end buffer rows.  But should fill ragged edges.
+#    expand(row=1:max(row+1), column) # use this if you want buffer rows at the end of each bed
+# 
+# germinated <- germ.fill %>%
+#   left_join(germinated) %>%
+#   mutate(pop.id=ifelse(is.na(pop.id), "buffer", pop.id))
+# 
+# germinated
+```
+
+
+
+
+
+### Correct positions for field mistakes / swaps
+
+```{r}
+## not updated for 2023 WL2
+# # Fix replacement made in screenhouse:
+# cor1 <- plants %>% filter(parent.pop=="YO8" & mf==7 & rep==12) %>%
+#   mutate(parent.pop="SQ3", mf=2, rep=14)
+# 
+# corrected <- plants %>%
+#   rows_update(cor1, by=c("block", "row", "column"))
+# 
+# # Fix swaps made while planting
+# 
+# cor2 <- plants %>% filter((parent.pop=="YO8" & mf==2 & rep==8) |( parent.pop=="FR" & mf==5 & rep==1)) %>%
+#   mutate(row=rev(row))
+# 
+# cor3 <- plants %>% filter((parent.pop=="YO7" & mf==4 & rep==5) | (parent.pop=="TM2" & mf==7 & rep==9)) %>%
+#   mutate(row=rev(row), column=rev(column))
+# 
+# cor4 <- plants %>% filter((parent.pop=="SQ2" & mf==1 & rep==6) | (parent.pop=="LV1" & mf==1 & rep==6)) %>%
+#   mutate(row=rev(row), column=rev(column))
+# 
+# cor5 <- plants %>% filter((parent.pop=="YO4" & mf==3 & rep==12) | (parent.pop=="LV1" & mf==7 & rep==10)) %>%
+#   mutate(row=rev(row), column=rev(column))
+# 
+# corrected <- corrected %>%
+#   rows_update(bind_rows(cor2, cor3, cor4, cor5), by=c("parent.pop", "mf", "rep"))
+# 
+# # Fix Bed K block swaps
+# 
+# cor6 <- plants %>% filter(block=="K2" & row > 22 & row < 37) %>%
+#   mutate(block="K1", row=row-22)
+# 
+# cor7 <- plants %>% filter(block=="K1" & row < 15) %>%
+#   mutate(block="K2", row=row+22)
+# 
+# corrected <- corrected %>%
+#   rows_update(bind_rows(cor6,cor7), by=c("parent.pop", "mf", "rep"))
+# 
+# plants <- corrected
+# 
+# plants %>% arrange(parent.pop, mf, rep) %>%
+#   select(parent.pop, mf, rep, bed, block, row, column, everything() ) %>% write_sheet("https://docs.google.com/spreadsheets/d/1EaSA2QrlWAjFR35pedcvheQp3X7Agsla6pZtE2C1QJ4",
+#                                                         sheet="Corrected Bed Map 2022-12-06")
+
+```
+
+
+
+## combine bed map and field map
+
+first get block rows correct and write to gsheets
+```{r}
+germinated <- germinated %>%
+  ungroup() %>%
+  arrange(block, row, column) %>%
+  rename(blockrow=row, blockcolumn=column) %>%
+  group_by(block) %>%
+  mutate(blockrow=as.numeric(as.factor(blockrow))) %>%
+  ungroup()
+
+
+# germinated %>% arrange(pop.id, mf, rep) %>%
+#   select(pop.id, mf, rep, block, row, column, everything() ) %>% 
+#   write_sheet(popsheet,
+#               sheet="Buffer New Bed Map")
+
+germinated %>% arrange(rack, unique.ID) %>%
+  select(rack, unique.ID, pop.id, rep, block, blockrow, blockcolumn ) %>%
+  write_sheet(popsheet,
+              sheet="Randomization Map")
+```
+
+
+```{r}
+plan3 <- plan3 %>%
+  ungroup() %>%
+  arrange(bedcol, row, column) %>%
+  rename(bedrow=row)
+
+#combine
+plan3_plants <- full_join(plan3, germinated)
+
+# reverse positions in even beds (to "snake" the blocks through the beds)
+# plan3_plants <- plan3_plants %>%
+#   group_by(bedcol) %>%
+#   mutate(across(.cols=block:rep, .fns= ~ ifelse(bedcol%%2==0, rev(.x), .x))) %>%
+#   ungroup()
+
+# Note: the above really should be done but it is trick to coordinate with the blocked positions from the field.
+# Probably need a new strategy of adding "germinated" plants to the plan.  Like arrange the plan3 df in
+# the correct order with the snaking, and then pull in the germinated plants, possible one at a time to fill it up 
+# in the correct order.  Didn't happen for 2024.
+
+# set up labels
+plan3_plants <- plan3_plants %>%
+  mutate(column=LETTERS[column]) %>%
+  mutate(#label=ifelse(buffer, "buff", str_c(parent.pop, "\n", mf, "-", rep) ),
+    label=ifelse(buffer, "buff", unique.ID),
+    label=ifelse(status=="available" & pop.id=="buffer", "buff", label),
+    label=ifelse(is.na(label), "", label),
+    colorblock=ifelse(is.na(block), status, block),
+    colorblock=ifelse(status=="available" & pop.id=="buffer", "buffer", colorblock))
+
+plan3_plants
+
+#Write it out
+
+plan3_plants %>% arrange(pop.id, rep) %>%
+  select(pop.id, rep, everything() ) %>%
+  write_sheet(popsheet,
+              sheet="Buffer New Bed Map")
+```
+
+
+```{r, fig.height=12}
+pdf("../output/2024-WL2-planting_maps.pdf",width = 8.5, height = 11)
+
+colors=c("grey40", "yellow", "blue", "magenta", rep(c("orange", "skyblue", "green"), length.out=length(germblocks))) %>%
+  set_names("out-of-bounds", "buffer", "2023-survivor", "2023-TM2-fruit", germblocks)
+
+
+for(b in unique(plan3_plants$bed)) {
+  pl1 <- plan3_plants %>% filter(bed==b, bedrow<33) %>%
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label, fill=colorblock)) +
+    scale_fill_manual(values=colors) +
+    geom_circle(alpha=.5, color="grey70") +
+    geom_text(aes(x=x_pos, y=y_pos), size=3, lineheight=.8) +
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() +
+    coord_equal(ratio=.4) + 
+    ggtitle(str_c("Bed ", b, ", sheet 1"))
+  print(pl1)
+  pl2 <- plan3_plants %>% filter(bed==b, bedrow>=33) %>%
+    ggplot(aes(x0=x_pos, y0=y_pos, r=radius, label=label, fill=colorblock)) +
+    scale_fill_manual(values=colors) +
+    geom_circle(alpha=.5, color="grey70") +
+    geom_text(aes(x=x_pos, y=y_pos), size=3, lineheight=.8) +
+    theme(axis.text.x = element_text(angle=90, size=12, vjust = 0.5)) +
+    xlab("position (cm)") + ylab("position (cm)") +
+    scale_y_reverse() +
+    coord_equal(ratio=.4) + 
+    ggtitle(str_c("Bed ", b, ", sheet 2"))
+  print(pl2)
+}
+
+dev.off()
+```
+
+Randomization maps
+
+```{r, fig.height=11, fig.width=8.5}
+
+pdf("../output/2024-WL2-randomization_maps.pdf",width = 8.5, height = 11)
+
+germinated <- germinated %>% arrange(block, blockrow, blockcolumn)
+
+for(b in unique(germinated$block)) {
+  pl <- germinated %>% filter(block==b) %>%
+#    mutate(label=ifelse(parent.pop=="buffer", "buff", str_c(parent.pop, "\n", mf, "-", rep) )) %>%
+    mutate(label=ifelse(pop.id=="buffer", "buff", unique.ID)) %>%
+    mutate(label=ifelse(is.na(label), "buff", label)) %>%
+    ggplot() +
+    geom_label(aes(x=blockcolumn, y=blockrow, label=label), size=3, lineheight=.8) +
+    theme(axis.text = element_text(size=12)) +
+    scale_y_reverse(breaks = 1:31) +
+    scale_x_discrete(position = "top") +
+    ggtitle(str_c("Block ", b)) +
+    coord_equal(ratio=.5)
+  print(pl)
+}
+
+dev.off()
+
+```
+
+
