@@ -55,18 +55,22 @@ F1s_update_short_2022 <- F1s_update_short %>% filter(date_crossed>"2023-05-01") 
   mutate(date_crossed=ymd(date_crossed),
          date_collected=ymd(date_collected))
 F1s_update_short_year_corrected <- bind_rows(F1s_update_short_2022, F1s_update_short_2023)
+
+#F1s_update_short_year_corrected %>% filter(!is.na(duplicate)) %>% arrange(dame_pop, dame_mf_rep, sire_pop, sire_mf_rep, date_crossed, date_collected, seeds_avail_2024)
+#F1s_update_short_year_corrected %>% arrange(dame_pop, dame_mf_rep, sire_pop, sire_mf_rep, date_crossed, date_collected, seeds_avail_2024)
+
+F1s_update_duplicates_corrected <- F1s_update_short_year_corrected %>% 
+  arrange(dame_pop, dame_mf_rep, sire_pop, sire_mf_rep, date_crossed, date_collected, seeds_avail_2024) %>% 
+  distinct(dame_pop, dame_mf_rep, sire_pop, sire_mf_rep, date_crossed, date_collected, .keep_all=TRUE)
+
 ```
 
 ### F1s Merge
 ```{r}
-F1s_all <- full_join(F1s_short, F1s_update_short_year_corrected) 
-#Warning: Detected an unexpected many-to-many relationship between `x` and `y`.
-#Some merge issues, should check this
+F1s_all <- full_join(F1s_short, F1s_update_duplicates_corrected) 
+#some extra rows --> some in the update doc that are not in the original doc
 
-F1s_all %>% filter(!is.na(duplicate))
-F1s_all %>% filter(is.na(seeds_avail))
-F1s_all %>% filter(dame_pop=="WL2", sire_pop=="BH")
-F1s_all %>% filter(dame_pop=="BH", sire_pop=="WL2")
+ISSUES <- F1s_all %>% filter(is.na(seeds_avail)) #2 ROWS, NOT IN OG DOC 
 
 #ignoring merge issues for now
 F1s_plant <- F1s_all %>% 
@@ -76,8 +80,7 @@ F1s_plant <- F1s_all %>%
   arrange(Sum_Seeds) 
 #F1s_plant
 dim(F1s_plant) #40 types of F1s
-sum(F1s_plant$Sum_Seeds) #955 total seeds available
-#sum(F1s_plant$pots_to_plant) 
+sum(F1s_plant$Sum_Seeds) #734 total seeds available
 
 F1s_plant_summarize_WL2 <- F1s_plant %>% 
   mutate(WL2_mom =str_detect(dame_pop, "WL2"), 
@@ -89,7 +92,7 @@ F1s_plant_summarize_WL2 <- F1s_plant %>%
   select(dame_pop:Sum_Seeds, WL2_cross) 
 head(F1s_plant_summarize_WL2)
 dim(F1s_plant_summarize_WL2) #18 types of F1s with WL2 involved 
-sum(F1s_plant_summarize_WL2$Sum_Seeds) #403 WL2 F1 seeds 
+sum(F1s_plant_summarize_WL2$Sum_Seeds) #297 WL2 F1 seeds 
 ```
 
 
@@ -141,5 +144,14 @@ dim(F2s_short_after_ripened_summarize_WL2) #48 types of F2s with WL2 involved
 F2s_short_after_ripened_summarize_WL2 %>% filter(Cross_Type=="BC1") #11 BC1s with seeds available 
 sum(F2s_short_after_ripened_summarize_WL2$Sum_Seeds) #2941 total seeds available
 
+```
+
+## Make a planning sheet
+```{r}
+gs4_create(
+  "Summer_25_Planting_Planning",
+  sheets = list(F2s=F2s_short_after_ripened_summarize_WL2,
+                F1s=F1s_plant_summarize_WL2)
+)
 ```
 
