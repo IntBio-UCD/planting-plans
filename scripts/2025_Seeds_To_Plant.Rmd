@@ -99,7 +99,7 @@ F2s <- read_sheet(url_f2s,
                   sheet = "Collected fruits F2 seed",
                   #col_types=cols(.default=col_character()), #force all columns to be character
                   na=c("NA", "")) 
-head(F2s) #need to make everything a character 
+#head(F2s) #need to make everything a character 
 
 F2s_short <- F2s %>% 
   select(dame_pop=`dame pop/hybrid`, dame_mf_rep=`dame mf-rep/ID`, sire_pop=`sire pop/hybrid`,
@@ -112,7 +112,7 @@ F2s_short <- F2s %>%
   mutate(sire_pop=str_replace(sire_pop, "X", "x")) %>% 
   mutate(date_collected=ymd(date_collected), Year_Collected=year(date_collected),
         Year_Collected=ifelse(is.na(Year_Collected), 2023, Year_Collected))
-head(F2s_short)
+#head(F2s_short)
 
 F2s_short_after_ripened <- F2s_short %>% filter(Year_Collected < 2025)
 
@@ -139,5 +139,7 @@ F2s_short_after_ripened_summarize_WL2 <- F2s_plant %>%
 head(F2s_short_after_ripened_summarize_WL2)
 dim(F2s_short_after_ripened_summarize_WL2) #48 types of F2s with WL2 involved 
 F2s_short_after_ripened_summarize_WL2 %>% filter(Cross_Type=="BC1") #11 BC1s with seeds available 
+sum(F2s_short_after_ripened_summarize_WL2$Sum_Seeds) #2941 total seeds available
+
 ```
 
