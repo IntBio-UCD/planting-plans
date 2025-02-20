@@ -93,6 +93,23 @@ F1s_plant_summarize_WL2 <- F1s_plant %>%
 head(F1s_plant_summarize_WL2)
 dim(F1s_plant_summarize_WL2) #18 types of F1s with WL2 involved 
 sum(F1s_plant_summarize_WL2$Sum_Seeds) #297 WL2 F1 seeds 
+
+F1s_to_plant_2025 <- F1s_plant_summarize_WL2 %>% 
+  mutate(BC1_parent=if_else(dame_pop=="TM2" | 
+                              dame_pop=="DPR" |
+                              dame_pop=="BH" |
+                              dame_pop=="WV" |
+                              dame_pop=="WL1" |
+                              sire_pop=="TM2" | 
+                              sire_pop=="DPR" |
+                              sire_pop=="BH" |
+                              sire_pop=="WV" |
+                              sire_pop=="WL1", TRUE, FALSE)) %>% 
+ # filter(Sum_Seeds>=5) %>% 
+  mutate(plantable_seeds = if_else(BC1_parent==TRUE, Sum_Seeds - 10, Sum_Seeds - 5),
+         pots_to_plant = ifelse(plantable_seeds<10, plantable_seeds, 10),
+         seeds_to_plant = ifelse(plantable_seeds<20, plantable_seeds, 20))
+F1s_to_plant_2025
 ```
 
 
@@ -144,6 +161,23 @@ dim(F2s_short_after_ripened_summarize_WL2) #48 types of F2s with WL2 involved
 F2s_short_after_ripened_summarize_WL2 %>% filter(Cross_Type=="BC1") #11 BC1s with seeds available 
 sum(F2s_short_after_ripened_summarize_WL2$Sum_Seeds) #2941 total seeds available
 
+F2s_to_plant_2025 <- F2s_short_after_ripened_summarize_WL2 %>% 
+  mutate(BC2_parent=if_else(Cross_Type=="BC1" & str_detect(dame_pop, "TM2") | 
+                            Cross_Type=="BC1" & str_detect(dame_pop, "DPR") |
+                            Cross_Type=="BC1" & str_detect(dame_pop, "BH" )|
+                            Cross_Type=="BC1" & str_detect(dame_pop, "WV" )|
+                            Cross_Type=="BC1" & str_detect(dame_pop, "WL1") |
+                              Cross_Type=="BC1" & str_detect(sire_pop,"TM2") | 
+                              Cross_Type=="BC1" & str_detect(sire_pop,"DPR") |
+                              Cross_Type=="BC1" & str_detect(sire_pop,"BH" )|
+                              Cross_Type=="BC1" & str_detect(sire_pop,"WV" )|
+                              Cross_Type=="BC1" & str_detect(sire_pop,"WL1"), TRUE, FALSE)) #%>% 
+ # filter(Sum_Seeds>=5) %>% 
+ # mutate(plantable_seeds = if_else(BC1_parent==TRUE, Sum_Seeds - 20, Sum_Seeds - 5),
+  #       pots_to_plant = ifelse(plantable_seeds<10, plantable_seeds, 10),
+   #      seeds_to_plant = ifelse(plantable_seeds<20, plantable_seeds, 20))
+F2s_to_plant_2025 %>% arrange(BC2_parent, Sum_Seeds)
+summary(F2s_to_plant_2025) #mean seeds = 25, median = 13
 ```
 
 ## Make a planning sheet
