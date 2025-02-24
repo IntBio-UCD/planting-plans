@@ -251,8 +251,8 @@ F2s_labels_plan
 gs4_create(
   "Summer_25_Planting_Planning",
   sheets = list(Parents=parents_labels_plan,
-                F2s=F1s_labels_plan,
-                F1s=F2s_labels_plan)
+                F1s=F1s_labels_plan,
+                F2s=F2s_labels_plan)
 )
 #need to add rack #, dame_mf and sire_mf, and unique.ID
 ```
