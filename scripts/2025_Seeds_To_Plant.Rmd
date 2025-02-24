@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Load libraries
+
 ```{r}
 library(tidyverse)
 library(googlesheets4)
@@ -21,6 +22,7 @@ url_f1s_2024_update <- "https://docs.google.com/spreadsheets/d/1W9sGeCHn3l0zRb8b
 ## Load Data
 
 ### F1s
+
 ```{r}
 F1s <- read_sheet(url_f1s,
                   sheet = "Collected fruits list F1 seed",
@@ -32,6 +34,7 @@ head(F1s_short)
 ```
 
 ### F1s Update
+
 ```{r}
 F1s_update <- read_sheet(url_f1s_2024_update,
                   sheet = "Collected fruits F2 seed",
@@ -66,13 +69,13 @@ F1s_update_duplicates_corrected <- F1s_update_short_year_corrected %>%
 ```
 
 ### F1s Merge
+
 ```{r}
 F1s_all <- full_join(F1s_short, F1s_update_duplicates_corrected) 
 #some extra rows --> some in the update doc that are not in the original doc
 
 ISSUES <- F1s_all %>% filter(is.na(seeds_avail)) #2 ROWS, NOT IN OG DOC 
 
-#ignoring merge issues for now
 F1s_plant <- F1s_all %>% 
   mutate(seeds_avail_combined=if_else(is.na(seeds_avail_2024), seeds_avail, seeds_avail_2024)) %>% 
   group_by(dame_pop, sire_pop) %>% 
@@ -105,15 +108,15 @@ F1s_to_plant_2025 <- F1s_plant_summarize_WL2 %>%
                               sire_pop=="BH" |
                               sire_pop=="WV" |
                               sire_pop=="WL1", TRUE, FALSE)) %>% 
- # filter(Sum_Seeds>=5) %>% 
-  mutate(plantable_seeds = if_else(BC1_parent==TRUE, Sum_Seeds - 10, Sum_Seeds - 5),
-         pots_to_plant = ifelse(plantable_seeds<10, plantable_seeds, 10),
-         seeds_to_plant = ifelse(plantable_seeds<20, plantable_seeds, 20))
+  mutate(pots_to_plant_raw = if_else(Sum_Seeds<3, Sum_Seeds, Sum_Seeds/3),
+         pots_to_plant_round = round(pots_to_plant_raw),
+         seeds_to_plant = Sum_Seeds)
 F1s_to_plant_2025
+sum(F1s_to_plant_2025$pots_to_plant_round) #97 pots 
 ```
 
-
 ### F2s
+
 ```{r}
 F2s <- read_sheet(url_f2s,
                   sheet = "Collected fruits F2 seed",
@@ -171,21 +174,127 @@ F2s_to_plant_2025 <- F2s_short_after_ripened_summarize_WL2 %>%
                               Cross_Type=="BC1" & str_detect(sire_pop,"DPR") |
                               Cross_Type=="BC1" & str_detect(sire_pop,"BH" )|
                               Cross_Type=="BC1" & str_detect(sire_pop,"WV" )|
-                              Cross_Type=="BC1" & str_detect(sire_pop,"WL1"), TRUE, FALSE)) #%>% 
- # filter(Sum_Seeds>=5) %>% 
- # mutate(plantable_seeds = if_else(BC1_parent==TRUE, Sum_Seeds - 20, Sum_Seeds - 5),
-  #       pots_to_plant = ifelse(plantable_seeds<10, plantable_seeds, 10),
-   #      seeds_to_plant = ifelse(plantable_seeds<20, plantable_seeds, 20))
-F2s_to_plant_2025 %>% arrange(BC2_parent, Sum_Seeds)
-summary(F2s_to_plant_2025) #mean seeds = 25, median = 13
+                              Cross_Type=="BC1" & str_detect(sire_pop,"WL1"), TRUE, FALSE)) %>% 
+  filter(BC2_parent==FALSE) %>% 
+  mutate(pots_to_plant_raw = if_else(Sum_Seeds<3, Sum_Seeds, Sum_Seeds/3),
+         pots_to_plant_round = round(pots_to_plant_raw),
+         seeds_to_plant = Sum_Seeds) %>% 
+  arrange(seeds_to_plant)
+F2s_to_plant_2025
+sum(F2s_to_plant_2025$pots_to_plant_round) #357
+sum(F2s_to_plant_2025$seeds_to_plant) #1049
+summary(F2s_to_plant_2025) #avg pots to plant = 8
+```
+
+### Parents
+```{r}
+parents <- tibble(pop.id=c("LV1", "SQ3", "WL1", "YO11", "BH", "CC", "DPR", "WV", "TM2", "WL2"), 
+                  pots_to_plant=c(21, 21, 21, 21, 21, 21, 21, 21, 98, 98),
+                  elevation_class=c("High", "High", "High", "High", "Low", "Low", "Low", "Low", "Low", "High")) #these are not neccesarily accurate, just for easy coding 
+#parents
+
+parents_labels <- parents %>% slice(rep(1:n(), times = pots_to_plant))
+parents_labels_germ <- parents_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number()) %>% 
+  arrange(elevation_class)
+parents_labels_germ
 ```
 
 ## Make a planning sheet
+
+stratification.date, pop.id, rep
+```{r}
+parents_labels_plan <- parents_labels_germ %>% 
+  ungroup() %>% 
+  mutate(stratification.date = if_else(elevation_class=="High", "2025-02-27", "2025-03-27")) %>% 
+  select(stratification.date, pop.id, Rep)
+parents_labels_plan
+```
+
+```{r}
+F1s_labels <- F1s_to_plant_2025 %>% 
+  unite("pop.id", dame_pop:sire_pop, sep=" x ", remove = FALSE) %>% 
+  slice(rep(1:n(), times = pots_to_plant_round))
+
+F1s_labels_germ <- F1s_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number())
+  
+F1s_labels_plan <- F1s_labels_germ %>% 
+  ungroup() %>% 
+  arrange(pots_to_plant_round) %>% 
+  mutate(stratification.date="2025-02-27") %>% 
+  select(stratification.date, pop.id, Rep)
+
+F1s_labels_plan
+```
+
+
+```{r}
+F2s_labels <- F2s_to_plant_2025 %>% 
+  mutate(dame_pop = paste0("(", dame_pop, ")"), sire_pop = paste0("(", sire_pop, ")")) %>% 
+  unite("pop.id", dame_pop:sire_pop, sep=" x ", remove = FALSE) %>% 
+  slice(rep(1:n(), times = pots_to_plant_round))
+
+F2s_labels_germ <- F2s_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number())
+  
+F2s_labels_plan <- F2s_labels_germ %>% 
+  ungroup() %>% 
+  arrange(pots_to_plant_round) %>% 
+  mutate(stratification.date="2025-02-27") %>% 
+  select(stratification.date, pop.id, Rep)
+
+F2s_labels_plan
+```
+
 ```{r}
 gs4_create(
   "Summer_25_Planting_Planning",
-  sheets = list(F2s=F2s_short_after_ripened_summarize_WL2,
-                F1s=F1s_plant_summarize_WL2)
+  sheets = list(Parents=parents_labels_plan,
+                F2s=F1s_labels_plan,
+                F1s=F2s_labels_plan)
 )
+#need to add rack #, dame_mf and sire_mf, and unique.ID
 ```
 
+## Make a planting sheet
+pop.id, rep, unique.id, seeds_per_pot, Notes 
+
+```{r}
+parents_labels_plant <- parents_labels_germ %>% 
+  ungroup() %>% 
+  mutate(stratification.date = if_else(elevation_class=="High", "2025-02-27", "2025-03-27"),
+         seeds_to_plant=3*pots_to_plant) %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant, seeds_to_plant)
+  
+F1s_labels_plant <- F1s_labels_germ %>% 
+  ungroup() %>% 
+  arrange(pots_to_plant_round) %>% 
+  mutate(stratification.date="2025-02-27") %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant=pots_to_plant_round, seeds_to_plant)
+
+F2s_labels_plant <- F2s_labels_germ %>% 
+  ungroup() %>% 
+  arrange(pots_to_plant_round) %>% 
+  mutate(stratification.date="2025-02-27") %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant=pots_to_plant_round, seeds_to_plant)
+```
+
+```{r}
+eight_weeks_strat <- parents_labels_plant %>% 
+  filter(stratification.date=="2025-02-27") %>% 
+  bind_rows(F1s_labels_plant, F2s_labels_plant)
+```
+
+```{r}
+four_weeks_strat <- parents_labels_plant %>% 
+  filter(stratification.date=="2025-03-27")
+```
+
+```{r}
+gs4_create(
+  "Summer_25_Planting_Sheets",
+  sheets = list(eight_weeks_strat=eight_weeks_strat,
+                four_weeks_strat=four_weeks_strat)
+)
+```
