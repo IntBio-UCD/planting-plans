@@ -89,5 +89,7 @@ F2s_planted <- high_elev_planted %>%
   arrange(pop.id, Rep)
 
 F2s_planted
+
+sheet_write(F2s_planted, ss="https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86fcYkFyMuRCqCc-XnM/edit?gid=198044381#gid=198044381")
 ```
 
