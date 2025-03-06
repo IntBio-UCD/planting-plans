@@ -1,0 +1,93 @@
+---
+title: "2025_Planting_Sample_Size"
+author: "Brandie QC"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Checking sample sizes after planting 
+
+## Libraries 
+```{r}
+library(tidyverse)
+library(googlesheets4)
+```
+
+## planting sheets
+```{r}
+high_elev_plants <- read_csv("../input/WL2_planting_sheets_corrected_20250227.csv")
+```
+
+```{r}
+high_elev_plants %>% filter(is.na(`Rack #`)) #all not planted
+high_elev_planted <- high_elev_plants %>% 
+  filter(!is.na(`Rack #`)) %>% 
+  filter(is.na(Notes) | Notes!="couldn't find seed envelopes") %>% 
+  mutate(pop.id=str_replace_all(pop.id, "X", "x")) %>% 
+  mutate(Type=if_else(str_detect(pop.id, "\\("), "F2",
+                      if_else(str_detect(pop.id, "x"), "F1",
+                                 "Parents")))
+
+dim(high_elev_planted) #actually planted 610 pots (22 less than planned)
+
+high_elev_planted %>% group_by(pop.id) %>% summarise(n=n())
+high_elev_planted %>% group_by(Type) %>% summarise(n=n()) #pots per type
+```
+
+## output for planning doc 
+```{r}
+F1s_planted <- high_elev_planted %>% 
+  filter(Type=="F1") %>% 
+  select(Type, stratification.date, pop.id, dame_mf, sire_mf=`sire mf`, `seeds_per pot`, Rep, `Rack #`, Notes) %>% 
+  mutate(dame_mf=if_else(is.na(dame_mf), NA,
+                         if_else(dame_mf=="3-Mar", "3-3",
+                                 if_else(dame_mf=="3-Jan", "1-3",
+                                         if_else(dame_mf=="3-Feb", "2-3",
+                                                 if_else(dame_mf=="2-Feb", "2-2",
+                                                         if_else(dame_mf=="1-Aug", "8-1",
+                                                                 if_else(dame_mf=="1-Oct", "10-1", dame_mf
+                                         )))))))) %>% 
+  mutate(sire_mf=if_else(is.na(sire_mf), NA,
+                         if_else(sire_mf=="10-Aug", "8-10",
+                                 if_else(sire_mf=="1-Aug", "8-1",
+                                         if_else(sire_mf=="2-Feb", "2-2",
+                                                 if_else(sire_mf=="1-Oct", "10-1",
+                                                         if_else(sire_mf=="1-Feb", "2-1",
+                                                                 if_else(sire_mf=="2-Nov", "11-2", 
+                                                                         if_else(sire_mf=="1-Nov", "11-1", sire_mf
+                                         ))))))))) %>% 
+  arrange(pop.id, Rep)
+
+F1s_planted
+
+sheet_write(F1s_planted, ss="https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86fcYkFyMuRCqCc-XnM/edit?gid=198044381#gid=198044381")
+```
+
+```{r}
+F2s_planted <- high_elev_planted %>% 
+  filter(Type=="F2") %>% 
+  select(Type, stratification.date, pop.id, dame_mf, sire_mf=`sire mf`, `seeds_per pot`, Rep, `Rack #`, Notes) %>% 
+  mutate(dame_mf=if_else(is.na(dame_mf), NA,
+                         if_else(dame_mf=="45691", "2-3",
+                                 if_else(dame_mf=="45730", "3-14",
+                                         if_else(dame_mf=="14-Mar", "3-14",
+                                                 if_else(dame_mf=="1-Feb", "2-1",
+                                                         if_else(dame_mf=="2-May", "5-2",
+                                                                 if_else(dame_mf=="1-May", "5-11",
+                                                                 if_else(dame_mf=="2-Feb", "2-2", dame_mf
+                                         ))))))))) %>% 
+  mutate(sire_mf=if_else(is.na(sire_mf), NA,
+                         if_else(sire_mf=="3-Jul", "7-3",
+                                 if_else(sire_mf=="3-Feb", "2-3",
+                                                 if_else(sire_mf=="3-Jan", "1-3",
+                                                         if_else(sire_mf=="13-Feb", "2-13", sire_mf
+                                         )))))) %>% 
+  arrange(pop.id, Rep)
+
+F2s_planted
+```
+
