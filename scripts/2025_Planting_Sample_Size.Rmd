@@ -20,11 +20,13 @@ library(googlesheets4)
 ## planting sheets
 ```{r}
 high_elev_plants <- read_csv("../input/WL2_planting_sheets_corrected_20250227.csv")
+low_elev_plants <- read_csv("../input/WL2_planting_sheets_20250327_corrected.csv")
 ```
 
 ```{r}
 high_elev_plants %>% filter(is.na(`Rack #`)) #all not planted
 high_elev_planted <- high_elev_plants %>% 
+  select(-`pots_to plant`, -`total_seeds _to_plant`) %>% 
   filter(!is.na(`Rack #`)) %>% 
   filter(is.na(Notes) | Notes!="couldn't find seed envelopes") %>% 
   mutate(pop.id=str_replace_all(pop.id, "X", "x")) %>% 
@@ -38,7 +40,32 @@ high_elev_planted %>% group_by(pop.id) %>% summarise(n=n())
 high_elev_planted %>% group_by(Type) %>% summarise(n=n()) #pots per type
 ```
 
+```{r}
+low_elev_plants %>% filter(is.na(`Rack #`)) #no rows without a rack number 
+low_elev_planted <- low_elev_plants %>% 
+  select(-`pots to - plant`, -`total_seeds to_plant -`) %>% 
+  rename(seeds_per_pot=`seeds_per _pot`, mf=`maternal family`) %>% 
+  mutate(Type="Parents", mf=as.character(mf))
+
+names(low_elev_planted)
+names(high_elev_planted)
+```
+
 ## output for planning doc 
+```{r}
+high_elev_parents <- high_elev_planted %>% 
+  filter(Type=="Parents") %>% 
+  rename(seeds_per_pot=`seeds_per pot`, mf=dame_mf) %>% 
+  select(stratification.date:mf, Notes, Type) %>% 
+  mutate(stratification.date=mdy(stratification.date))
+unique(high_elev_parents$mf)
+
+parents_planted <- bind_rows(high_elev_parents, low_elev_planted) %>% 
+  select(Type, stratification.date, pop.id, mf, seeds_per_pot, Rep, `Rack #`, Notes) %>% 
+  arrange(pop.id, Rep)
+sheet_write(parents_planted, ss="https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86fcYkFyMuRCqCc-XnM/edit?gid=198044381#gid=198044381")
+```
+
 ```{r}
 F1s_planted <- high_elev_planted %>% 
   filter(Type=="F1") %>% 
@@ -92,4 +119,3 @@ F2s_planted
 
 sheet_write(F2s_planted, ss="https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86fcYkFyMuRCqCc-XnM/edit?gid=198044381#gid=198044381")
 ```
-
