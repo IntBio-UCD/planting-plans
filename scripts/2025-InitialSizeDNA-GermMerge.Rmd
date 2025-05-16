@@ -1,0 +1,77 @@
+---
+title: "2025-InitialSizeDNA-GermMerge"
+author: "Brandie QC"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+
+popsheet <- "https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86fcYkFyMuRCqCc-XnM/edit?gid=614923230#gid=614923230"
+```
+
+
+## get germination data
+
+```{r}
+germ_data <- read_csv("../input/WL2 2025 Germination Survey Data - Both_Weeks.csv") %>% 
+  select(pop.id:Unique.ID, Num_germ) %>% 
+  mutate(germinated.y.n = if_else(Num_germ>0, 1, 0)) %>% 
+  select(!Num_germ)
+names(germ_data)
+```
+
+## get transplant info (extra germs)
+```{r}
+transplants <- read_sheet(popsheet, 
+                  sheet = "Transplanted_plants",
+                  na=c("NA", "")) %>% 
+  select(old_uniqueID:Notes)
+names(transplants)
+transplants %>% filter(!is.na(Notes))
+```
+
+## Merge germ and transplants
+```{r}
+mfinfo <- germ_data %>% select(pop.id:sire_mf, Unique.ID)
+
+transplants_mf <- left_join(transplants, mfinfo, by=join_by(old_uniqueID == Unique.ID)) %>% 
+  select(pop.id:sire_mf, Rep=rep, Rack=new_rack, Unique.ID=new_uniqueID) %>% 
+  mutate(germinated.y.n=1)
+#head(transplants_mf)
+
+all_plants <- bind_rows(germ_data, transplants_mf) %>% 
+  select(Rack, pop.id:sire_mf, Rep, Unique.ID, germinated.y.n)
+names(all_plants)
+
+all_plants %>% filter(germinated.y.n==1) #674 plants that germinated
+```
+
+
+## Initial Size/DNA blank sheet
+```{r}
+sizedna_blank <- read_sheet(popsheet,
+                            sheet = "InitialSize/DNA_toPrint",  
+                            na=c("NA", "")) %>% 
+  filter(!is.na(pop.id)) %>% 
+  select(-germ.y.n, -Rack)
+names(sizedna_blank)
+```
+
+## Merge size/dna with germ info 
+```{r}
+sizedna_germ <- left_join(all_plants, sizedna_blank) %>% 
+  select(Rack:sire_mf, seeds_per_pot, Rep:germinated.y.n, height.cm:Notes)
+head(sizedna_germ)
+tail(sizedna_germ)
+
+sizedna_germ %>% 
+  sheet_write(popsheet, sheet = "InitialSize/DNA_toPrint2")
+```
+
