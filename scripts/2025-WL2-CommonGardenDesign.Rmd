@@ -3,6 +3,31 @@ title: "Common Garden Design"
 output: html_notebook
 ---
 
+## Notes for next year
+
+-   New rock/hole/unplantable locations:
+    -   C_5_D
+    -   C_9_D
+    -   C_10_D
+    -   E_12_B
+    -   E_26_B
+    -   E_44_A
+    -   E_47_A
+    -   E_5_C
+    -   E_6_D
+    -   E_12_C
+    -   E_13_C
+    -   F_21_D
+    -   G_15_C
+    -   G_17_D
+    -   G_29_D
+-    No rock (i.e. plantable)
+    -   D_5_B
+    -   E_9_B
+    -   E_30_D
+    -   F_17_D
+-   Julin suggested making first 5 rows for each block buffers / no plants
+
 ## Intro
 
 Determine randomization strategy and plant placing for 2024 Wrights Lake 2 Planting
@@ -18,6 +43,7 @@ popsheet <- "https://docs.google.com/spreadsheets/d/1mGTjn_UOthCdB2rr1f9Bd7JG86f
 ```
 
 ## IMPORTANT
+
 Snaking blocks through the beds really should be done but it is tricky to coordinate with the blocked positions from the field.
 
 ## get germination data
@@ -31,6 +57,7 @@ germ_only <- germ_data %>% filter(germinated.y.n==1)
 ```
 
 ## get transplant info (extra germs)
+
 ```{r}
 transplants <- read_sheet(popsheet, 
                   sheet = "Transplanted_plants",
@@ -39,6 +66,7 @@ transplants <- read_sheet(popsheet,
 ```
 
 ## Merge germ and transplants
+
 ```{r}
 mfinfo <- germ_data %>% select(pop.id:sire_mf, Unique.ID)
 
@@ -55,7 +83,6 @@ germinated <- bind_rows(germ_only, transplants_mf) %>%
 #674 plants that germinated
 names(germinated)
 ```
-
 
 ## assign blocks to germinated
 
@@ -76,13 +103,12 @@ germinated %>%
   arrange(n)
 ```
 
-A bit challenging because for pops with few reps total we should be careful to distribute the pops across the blocks.  
-Also different max rep sizes: ~50 for a couple F2s, 14 for at least a few of F1s.
+A bit challenging because for pops with few reps total we should be careful to distribute the pops across the blocks.\
+Also different max rep sizes: \~50 for a couple F2s, 14 for at least a few of F1s.
 
 Will go for 14 blocks total. That will be one rep per block for max F1 germ.
 
 I think one way this can work is to arrange by pops and mfs and then assign a randomized set of block labels to it.
-
 
 ```{r}
 #terminology with "germ" prefix is a leftover from UCD2022 when we planted both germinated and ungerminated seed.
@@ -123,13 +149,16 @@ germinated <- bind_rows(germinated_low_extra_rep, germinated_fullrep) %>%
 
 germinated  
 ```
+
 reality check distribution across mfs
+
 ```{r}
 # germinated %>%
 #   pivot_wider(id_cols = c(pop.id, mf), names_from = block, values_from = `germinated?`, values_fill = 0, values_fn = sum)
 ```
 
 reality check distribution across pop.ids
+
 ```{r}
 germinated %>%
   pivot_wider(id_cols = pop.id, names_from = block, values_from = reps, values_fill = 0, values_fn = sum) %>%
@@ -137,6 +166,7 @@ germinated %>%
 ```
 
 plants per block:
+
 ```{r}
 germinated %>%
   group_by(block) %>%
@@ -145,13 +175,14 @@ germinated %>%
 
 ## planting grid
 
-Plot is trapezoidal.  wide edges are 20m and 16.5m.  narrow are 15m and 7.5m .
+Plot is trapezoidal. wide edges are 20m and 16.5m. narrow are 15m and 7.5m .
 
-__numbers below updated to match more precise field measurements__
+**numbers below updated to match more precise field measurements**
 
 Try creating rectangular grid and then use blanks to narrow it.
 
 Create grid
+
 ```{r}
 stagger <- TRUE
 buffer.beds <- 0
@@ -179,6 +210,7 @@ plan3
 ```
 
 add positions
+
 ```{r}
 if (stagger) {
   column_offset <- sqrt((2*radius)^2 - radius^2) # Pythagorean theorem for offset spacing
@@ -197,7 +229,7 @@ if (stagger) {
 plan3
 ```
 
-add indicator for whether or not a position is available and inbounds 
+add indicator for whether or not a position is available and inbounds
 
 ```{r}
 bedrows   <- c(63, 61, 60, 59, 53, 47, 45, 34, 24, 20, 16)
@@ -294,6 +326,7 @@ plan3
 ```
 
 Get 2023 and 2024 plants that were still alive in Oct2024
+
 ```{r, warning=FALSE}
 survey <- read_sheet("https://docs.google.com/spreadsheets/d/1Fapx97xf0Dm2umHZHyu600dxtaUSEQxxoG9obZAHGH0/edit?gid=1049170772#gid=1049170772", na = c("", "NA"),
                      col_types = "ccicccccccccc") %>%
@@ -318,7 +351,6 @@ names(survey)
 unique(survey$status)
 ```
 
-
 ```{r}
 survey <- survey %>%
   select(bed, column=col, row=row, status, pop.ID, mf, rep, Unique.ID)  %>%
@@ -338,6 +370,7 @@ plan3 <- left_join(plan3, survey) %>%
 ```
 
 Add buffers at the beginning and end of each bed
+
 ```{r}
 plan3 <- plan3 %>%
   
@@ -351,6 +384,7 @@ plan3 <- plan3 %>%
 ```
 
 Plot it
+
 ```{r, fig.width=12, eval=TRUE}
 
 plan3 %>%
@@ -366,9 +400,9 @@ plan3 %>%
 
 ggsave("../output/2025-WL2-FieldPlan.jpeg", width = 10, height = 6)
 ```
- 
- 
+
 Position blocks in the available spots
+
 ```{r}
 blocksizes <- germinated %>%
   group_by(block) %>%
@@ -389,7 +423,6 @@ avail <- plan3 %>%
 
 
 ```
-
 
 ## Assign Plants
 
@@ -418,9 +451,8 @@ germinated  %>% arrange(pop.id) %>%# confirm different positions per block
 
 ```
 
-
-
 Fill in the blanks..
+
 ```{r}
 # germ.fill <- germinated %>%
 #   group_by(block) %>%
@@ -433,10 +465,6 @@ Fill in the blanks..
 # 
 # germinated
 ```
-
-
-
-
 
 ### Correct positions for field mistakes / swaps
 
@@ -485,11 +513,10 @@ Fill in the blanks..
 
 ```
 
-
-
 ## combine bed map and field map
 
 first get block rows correct and write to gsheets
+
 ```{r}
 germinated <- germinated %>%
   ungroup() %>%
@@ -512,7 +539,6 @@ germinated %>% arrange(Rack, Unique.ID) %>%
   write_sheet(popsheet,
               sheet="Randomization Map")
 ```
-
 
 ```{r}
 plan3_oldplants <- plan3 %>%
@@ -559,7 +585,6 @@ plan3_plants %>% arrange(pop.id, rep) %>%
   write_sheet(popsheet,
               sheet="Buffer New Bed Map")
 ```
-
 
 ```{r, fig.height=12}
 pdf("../output/2025-WL2-planting_maps.pdf",width = 8.5, height = 11)
@@ -622,5 +647,3 @@ for(b in unique(germinated$block)) {
 dev.off()
 
 ```
-
-
