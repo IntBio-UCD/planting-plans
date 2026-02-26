@@ -1,0 +1,126 @@
+---
+title: "2026_Seeds_To_Plant"
+author: "Brandie QC"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+urlBC1s <- "https://docs.google.com/spreadsheets/d/1bw6rzqCcrGjE5DuIe4oxC_GMPKG66nHHNyT_iY5umBQ/edit?gid=437525859#gid=437525859"
+```
+
+## Load Data
+
+### BC1s
+
+```{r}
+BC1s <- read_sheet(urlBC1s,
+                  sheet = "Available BC1 Seed February 2026",
+                  na=c("NA", "", "unknown")) 
+head(BC1s)
+
+BC1s_long <- BC1s %>% 
+  select(-...1) %>% 
+  pivot_longer(everything(),
+               names_to = "pop.id",
+               values_to = "SeedN")
+head(BC1s_long)
+dim(BC1s_long) #12 types
+sum(BC1s_long$SeedN) #905 seeds
+
+BC1s_to_plant_2026 <- BC1s_long %>% 
+  mutate(pots_to_plant_raw = SeedN/3,
+         pots_to_plant_round = round(pots_to_plant_raw),
+         seeds_to_plant = SeedN,
+         plant_type = "BC1")
+
+head(BC1s_to_plant_2026)
+sum(BC1s_to_plant_2026$pots_to_plant_round) #301 pots 
+
+BC1s_labels <- BC1s_to_plant_2026 %>% slice(rep(1:n(), times = pots_to_plant_round))
+BC1s_labels_germ <- BC1s_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number())
+```
+
+### BC2s
+
+```{r}
+BC2s <- tibble(pop.id = "((WL2 x WL1) x WL2) x WL2)", 
+               SeedN = 72)
+#1 type of BC2 with 72 seeds 
+
+BC2s_to_plant_2026 <- BC2s %>% 
+  mutate(pots_to_plant_raw = SeedN/3,
+         pots_to_plant_round = round(pots_to_plant_raw),
+         seeds_to_plant = SeedN,
+         plant_type = "BC2")
+
+head(BC2s_to_plant_2026)
+sum(BC2s_to_plant_2026$pots_to_plant_round) #24 pots 
+
+BC2s_labels <- BC2s_to_plant_2026 %>% slice(rep(1:n(), times = pots_to_plant_round))
+BC2s_labels_germ <- BC2s_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number())
+```
+
+### Parents
+```{r}
+parents <- tibble(pop.id=c("LV1", "SQ3", "WL1", "YO11", "BH", "CC", "DPR", "WV", "TM2", "WL2"), 
+                  pots_to_plant=c(21, 21, 21, 21, 21, 21, 21, 21, 98, 98),
+                  elevation_class=c("High", "High", "High", "High", "Low", "Low", "Low", "Low", "Low", "High")) #these are not neccessarily accurate, just for easy coding 
+
+parents_labels <- parents %>% slice(rep(1:n(), times = pots_to_plant))
+parents_labels_germ <- parents_labels %>% 
+  group_by(pop.id) %>% mutate(Rep = row_number()) %>% 
+  arrange(elevation_class)
+parents_labels_germ
+```
+
+## Make a planting sheet
+strat.date, pots_to_plant, total_seeds, seeds_per_pot, pop.id, rep, seeds_per_pot, Notes 
+
+```{r}
+parents_labels_plant <- parents_labels_germ %>% 
+  ungroup() %>% 
+  mutate(stratification.date = if_else(elevation_class=="High", "2026-03-04", "2026-04-01"),
+         seeds_to_plant=3*pots_to_plant) %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant, seeds_to_plant)
+  
+BC1s_labels_plant <- BC1s_labels_germ %>% 
+  arrange(pots_to_plant_round) %>% 
+  mutate(stratification.date="2026-03-04") %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant=pots_to_plant_round, seeds_to_plant)
+
+BC2s_labels_plant <- BC2s_labels_germ %>% 
+  mutate(stratification.date="2026-03-04") %>% 
+  select(stratification.date, pop.id, Rep, pots_to_plant=pots_to_plant_round, seeds_to_plant)
+```
+
+```{r}
+eight_weeks_strat <- parents_labels_plant %>% 
+  filter(stratification.date=="2026-03-04") %>% 
+  bind_rows(BC1s_labels_plant, BC2s_labels_plant)
+```
+
+```{r}
+four_weeks_strat <- parents_labels_plant %>% 
+  filter(stratification.date=="2026-04-01")
+```
+
+```{r}
+gs4_create(
+  "Summer_26_Planting_Sheets",
+  sheets = list(eight_weeks_strat=eight_weeks_strat,
+                four_weeks_strat=four_weeks_strat)
+)
+```
+
+## Make a planning sheet
