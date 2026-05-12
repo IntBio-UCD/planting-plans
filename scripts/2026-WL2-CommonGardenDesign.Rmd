@@ -262,7 +262,10 @@ rocks <- tribble(~bed, ~column, ~row,
                  "b", 1, 35,
                  "c", 4, 3,
                  "c", 4, 4,
+                 "c", 4, 5, #new rock/unplantable spot
                  "c", 1, 9,
+                 "c", 4, 9, #new rock/unplantable spot
+                 "c", 4, 10, #new rock/unplantable spot
                  "c", 3, 26,
                  "c", 4, 26,
                  "c", 3, 27,
@@ -270,7 +273,7 @@ rocks <- tribble(~bed, ~column, ~row,
                  "c", 1, 33,
                  "c", 3, 45,
                  "c", 3, 46,
-                 "d", 2, 5,
+                 #"d", 2, 5, no rock
                  "d", 1, 6,
                  "d", 3, 6,
                  "d", 4, 6,
@@ -281,23 +284,35 @@ rocks <- tribble(~bed, ~column, ~row,
                  "d", 1, 12,
                  "d", 2, 34,
                  "d", 3, 37,
+                 "e", 3, 5, #new rock/unplantable spot
                  "e", 1, 6,
-                 "e", 2, 9,
+                 "e", 4, 6, #new rock/unplantable spot
+                 #"e", 2, 9, no rock
+                 "e", 2, 12, #new rock/unplantable spot
+                 "e", 3, 12, #new rock/unplantable spot
                  "e", 2, 13,
+                 "e", 3, 13, #new rock/unplantable spot
                  "e", 4, 15,
                  "e", 4, 16,
+                 "e", 2, 26, #new rock/unplantable spot
                  "e", 1, 30,
                  "e", 2, 30,
                  "e", 3, 30,
-                 "e", 4, 30,
+                 #"e", 4, 30, no rock
+                 "e", 1, 44, #new rock/unplantable spot
+                 "e", 1, 47, #new rock/unplantable spot
                  "f", 2, 5,
                  "f", 3, 6,
-                 "f", 4, 17,
+                 #"f", 4, 17, no rock
                  "f", 4, 18,
+                 "f", 4, 21, #new rock/unplantable spot
                  "f", 2, 40,
-                 "g", 3, 23,
+                 "g", 3, 15, #new rock/unplantable spot
+                 "g", 4, 17, #new rock/unplantable spot
                  "g", 4, 22,
+                 "g", 3, 23,
                  "g", 4, 23,
+                 "g", 4, 29, #new rock/unplantable spot
                  "i", 1, 3,
                  "i", 3, 4,
                  "i", 4, 5,
