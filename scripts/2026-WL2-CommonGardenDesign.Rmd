@@ -342,35 +342,24 @@ plan3 <- left_join(plan3, rocks) %>%
 plan3
 ```
 
-Get 2023 and 2024 plants that were still alive in Oct2024
+Get 2023, 2024, and 2025 plants that were still alive in Oct2025
 
 ```{r, warning=FALSE}
-survey <- read_sheet("https://docs.google.com/spreadsheets/d/1Fapx97xf0Dm2umHZHyu600dxtaUSEQxxoG9obZAHGH0/edit?gid=1049170772#gid=1049170772", na = c("", "NA"),
-                     col_types = "ccicccccccccc") %>%
-  filter(unique.ID != "buffer") %>% #remove buffers
+survey <- read_sheet(popsheet, 
+                  sheet = "20260514_WinterSurv",
+                  na=c("NA", ""),
+                  col_types = "c") %>% 
+  filter(Unique.ID!="buffer") %>% #remove buffers
   filter(is.na(death.date)) %>% #keep only plants without a death date
-  filter(is.na(missing.date)) #keep only plants without a missing date
-
-
-pop_info <- read_csv("../input/Final_2023_2024_Pop_Loc_Info.csv") %>% #need this to identify 2023 TM2 fruiting 
-  select(Pop.Type:unique.ID) %>% 
-  rename(row=bedrow, col=bedcol) 
-
-survey <- left_join(survey, pop_info) %>% 
-   filter(Pop.Type!="2023-TM2-fruit") %>% #remove 2023 TM2 fruiting plants 
-  mutate(deadatplanting = if_else(is.na(survey.notes), NA,
-                                  if_else(survey.notes=="Dead at planting", "Yes", NA))) %>% 
-  filter(is.na(deadatplanting)) %>% 
-  rename(Unique.ID=unique.ID, pop.ID=pop)
-#130 alive in Oct 2024
+  select(bed:Unique.ID, death.date)
+#476 alive in Oct 2025
 
 names(survey)
-unique(survey$status)
 ```
-
+MERGE IN POP INFO FOR STATUS/POP.TYPE INFO 
 ```{r}
 survey <- survey %>%
-  select(bed, column=col, row=row, status, pop.ID, mf, rep, Unique.ID)  %>%
+  select(bed, column=col, row, status, pop.id, mf, rep, Unique.ID)  %>%
   mutate(bed = tolower(bed),
          new_status=if_else(status=="2023-survivor", "2023-survivor", "2024-survivor"),
          column=case_match(column,
@@ -392,13 +381,15 @@ Add buffers at the beginning and end of each bed
 plan3 <- plan3 %>%
   
   #top buffers:
-  mutate(buffer=(row<=3 & str_detect(bed, "[c-h]")),
+  mutate(buffer=(row<=5 & str_detect(bed, "[c-h]")),
 
   #bottom buffers
          buffer=ifelse(row > (bedrows[bedcol]-2) & row <= bedrows[bedcol] & str_detect(bed, "[c-h]"), TRUE, buffer),
          status=ifelse(buffer, "buffer", status)
   )
 ```
+
+CHECK THAT NO ALIVE PLANTS IN THE NEW BUFFER REGION!!
 
 Plot it
 
