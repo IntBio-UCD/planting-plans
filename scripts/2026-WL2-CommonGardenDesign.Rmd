@@ -3,31 +3,6 @@ title: "Common Garden Design"
 output: html_notebook
 ---
 
-## Notes for next year
-
--   New rock/hole/unplantable locations:
-    -   C_5_D
-    -   C_9_D
-    -   C_10_D
-    -   E_12_B
-    -   E_26_B
-    -   E_44_A
-    -   E_47_A
-    -   E_5_C
-    -   E_6_D
-    -   E_12_C
-    -   E_13_C
-    -   F_21_D
-    -   G_15_C
-    -   G_17_D
-    -   G_29_D
--   No rock (i.e. plantable)
-    -   D_5_B
-    -   E_9_B
-    -   E_30_D
-    -   F_17_D
--   Julin suggested making first 5 rows for each block buffers / no plants
-
 ## Intro
 
 Determine randomization strategy and plant placing for 2026 Wrights Lake 2 Planting
@@ -46,46 +21,58 @@ popsheet <- "https://docs.google.com/spreadsheets/d/12E6iegjdVGfiqv1H9B_WJC0qA0_
 
 Snaking blocks through the beds really should be done but it is tricky to coordinate with the blocked positions from the field.
 
-## Need to update the below code!!
-
-## get germination data
+## get germination and transplant data
 
 ```{r}
-germ_data <- read_csv("../input/WL2 2025 Germination Survey Data - Both_Weeks.csv") %>% 
-  select(pop.id:Unique.ID, Num_germ) %>% 
-  mutate(germinated.y.n = if_else(Num_germ>0, 1, 0))
+germ_data <- read_csv("../input/WL2_2026_InitialSize_DNA_corrected_inprogress.csv") %>% 
+  select(Rack:Unique.ID, germ.y.n)
 
-germ_only <- germ_data %>% filter(germinated.y.n==1)
+popinfo <- read_sheet(popsheet, 
+                  sheet = "Labeling-ToPrint",
+                  na=c("NA", ""),
+                  col_types = "c") %>% 
+  select(Type, pop.id:sire_mf, Rep, Unique.ID) %>% 
+  mutate(Unique.ID=as.numeric(Unique.ID))
+popinfo_norep <- popinfo %>% select(-Rep)
+
+transplants <- read_csv("../input/WL2_2026_Transplanting_corrected.csv") #transplant info (extra germs)
+transplants_mf <- transplants %>% 
+  select(-rep) %>% 
+  mutate(germ.y.n="Y") %>% 
+  left_join(popinfo_norep, by=join_by(old_uniquelD == Unique.ID, pop.id)) %>% 
+  select(Type, pop.id, dame_mf:sire_mf, Unique.ID=new_uniquelD, Rack=new_rack, germ.y.n)
+
+newsdls <- tibble(old_uniquelD=c(3252, 3252, 3269, 3269, 3338, 3338, 3380, 3396),
+                  new_uniquelD=c(3953, 3954, 3955, 3956, 3957, 3958, 3959, 3960),
+                  germ.y.n="Y") #add sdls found during size/DNA census 
+newsdlspops <- newsdls %>% 
+  left_join(popinfo_norep, by=join_by(old_uniquelD == Unique.ID)) %>% 
+  select(Type, pop.id, dame_mf:sire_mf, Unique.ID=new_uniquelD, germ.y.n)
+
+
+germ_only <- germ_data %>% 
+  left_join(popinfo) %>% 
+  filter(!is.na(pop.id)) %>% 
+  bind_rows(transplants_mf) %>% 
+  bind_rows(newsdlspops) %>% 
+  rename(germinated.y.n=germ.y.n) %>% 
+  #remove plants that were not there during size/DNA
+  filter(Unique.ID!=3038) %>% 
+  filter(Unique.ID!=3490) %>% 
+  filter(Unique.ID!=3514) %>% 
+  filter(Unique.ID!=3920) %>% 
+  filter(Unique.ID!=3815) %>% 
+  filter(germinated.y.n=="Y")
 ```
 
-## get transplant info (extra germs)
-
 ```{r}
-transplants <- read_sheet(popsheet, 
-                  sheet = "Transplanted_plants",
-                  na=c("NA", "")) %>% 
-  select(old_uniqueID:Notes)
-```
-
-## Merge germ and transplants
-
-```{r}
-mfinfo <- germ_data %>% select(pop.id:sire_mf, Unique.ID)
-
-transplants_mf <- left_join(transplants, mfinfo, by=join_by(old_uniqueID == Unique.ID)) %>% 
-  select(pop.id:sire_mf, Rep=rep, Rack=new_rack, Unique.ID=new_uniqueID) %>% 
-  mutate(germinated.y.n=1)
-#head(transplants_mf)
-
-germinated <- bind_rows(germ_only, transplants_mf) %>% 
-  select(Rack, pop.id:sire_mf, rep=Rep, Unique.ID, germinated.y.n) %>% 
+germinated <- germ_only %>% 
   unite("mf", dame_mf:sire_mf, remove = FALSE, na.rm = TRUE) %>% 
   group_by(pop.id) %>% 
   mutate(rep_for_blocking=row_number()) #add smooth rep number for block assignments
-#674 plants that germinated
+#605 plants germinated
 names(germinated)
 ```
-
 ## assign blocks to germinated
 
 get a histogram of rep count
@@ -103,19 +90,24 @@ germinated %>%
   group_by(pop.id) %>%
   summarize(n=n()) %>%
   arrange(n)
+
+germinated %>%
+  group_by(pop.id) %>%
+  summarize(n=n()) %>% 
+  summary()
 ```
 
 A bit challenging because for pops with few reps total we should be careful to distribute the pops across the blocks.\
-Also different max rep sizes: \~50 for a couple F2s, 14 for at least a few of F1s.
+Also different max rep sizes: \~30 for a couple BC1 (With one >90), 5 for the BC2.
 
-Will go for 14 blocks total. That will be one rep per block for max F1 germ.
+Will go for 16 blocks total (that's the median sample size)
 
 I think one way this can work is to arrange by pops and mfs and then assign a randomized set of block labels to it.
 
 ```{r}
 #terminology with "germ" prefix is a leftover from UCD2022 when we planted both germinated and ungerminated seed.
 
-nblocks <- 14
+nblocks <- 16
 
 germblocks <- LETTERS[1:nblocks]
 
@@ -129,7 +121,7 @@ germinated_low_extra_rep <- germinated %>%
   #group_by(pop.id, mf) %>%
   group_by(pop.id) %>%
   mutate(reps=n()) %>%
-  filter(reps < 14 | rep_for_blocking > 14) %>% # because nblocks represents full replication.  
+  filter(reps < 16 | rep_for_blocking > 16) %>% # because nblocks represents full replication.  
   #Pull pops with less than nblocks reps and pull extra reps from those with > nblocks
   group_by(pop.id) %>%
   mutate(block= {map(1:ceiling(n()/nblocks), ~ sample(germblocks)) %>% #sampling without replacement 1 block at a time helps with even distribution across blocks.
@@ -159,7 +151,7 @@ reality check distribution across mfs
 #   pivot_wider(id_cols = c(pop.id, mf), names_from = block, values_from = `germinated?`, values_fill = 0, values_fn = sum)
 ```
 
-reality check distribution across pop.ids
+### reality check distribution across pop.ids
 
 ```{r}
 germinated %>%
@@ -167,7 +159,7 @@ germinated %>%
   relocate(germblocks)
 ```
 
-plants per block:
+### plants per block:
 
 ```{r}
 germinated %>%
@@ -183,7 +175,7 @@ Plot is trapezoidal. wide edges are 20m and 16.5m. narrow are 15m and 7.5m .
 
 Try creating rectangular grid and then use blanks to narrow it.
 
-Create grid
+### Create grid
 
 ```{r}
 stagger <- TRUE
@@ -192,7 +184,7 @@ buffer.rows <- 2 # on each edge of each bed
 exp.beds <- 11
 beds <- letters[1:(buffer.beds+exp.beds)]
 columns <- 4 # per bed
-rows <- 63 # four of which are buffers
+rows <- 63 # 9 of which are buffers
 plants <- length(beds) * columns * rows
 bedwidth <- 90 # cm
 furrow <- 100 #cm
@@ -211,7 +203,7 @@ plan3 <- plan3 %>%
 plan3
 ```
 
-add positions
+### add positions
 
 ```{r}
 if (stagger) {
@@ -231,7 +223,7 @@ if (stagger) {
 plan3
 ```
 
-add indicator for whether or not a position is available and inbounds
+### add indicator for whether or not a position is available and inbounds
 
 ```{r}
 bedrows   <- c(63, 61, 60, 59, 53, 47, 45, 34, 24, 20, 16)
@@ -239,10 +231,10 @@ bedrows   <- c(63, 61, 60, 59, 53, 47, 45, 34, 24, 20, 16)
 plan3 <- plan3 %>%
   mutate(status=ifelse(row <= bedrows[bedcol], "available", "out-of-bounds"))
 
-# eliminate some beds for 2025 because we have fewer plants
+# eliminate some beds for 2026 because we have fewer plants
 
 plan3 <- plan3 %>%
-  mutate(status=ifelse(str_detect(bed, "[abijk]"), "out-of-bounds", status))
+  mutate(status=ifelse(str_detect(bed, "[abhijk]"), "out-of-bounds", status))
 
 # block out tree position (approx)
 plan3 <- plan3 %>%
@@ -319,20 +311,6 @@ rocks <- tribble(~bed, ~column, ~row,
                  "k", 3, 5,
                  )
 
-rocks <- bind_rows(rocks,
-  tibble(
-    bed="h", 
-    column = c(rep(1,7),
-                rep(2,3),
-                rep(3, 6),
-                rep(4, 3)),
-    row = c(9:12, 14:16,
-            7, 14, 16,
-            4, 5, 7, 14, 16, 17,
-            11, 12, 13)
-  )
-) 
-
 rocks <- rocks %>% mutate(new_status="out-of-bounds") %>% arrange(bed, row, column)
 
 plan3 <- left_join(plan3, rocks) %>% 
@@ -342,7 +320,7 @@ plan3 <- left_join(plan3, rocks) %>%
 plan3
 ```
 
-Get 2023, 2024, and 2025 plants that were still alive in Oct2025
+### Get 2023, 2024, and 2025 plants that were still alive in Oct2025
 
 ```{r, warning=FALSE}
 survey <- read_sheet(popsheet, 
@@ -354,51 +332,64 @@ survey <- read_sheet(popsheet,
   select(bed:Unique.ID, death.date)
 #476 alive in Oct 2025
 
-names(survey)
+popinfo_2025 <- read_csv("../input/2025_Pop_Loc_Info Updated.csv") %>% 
+  select(bed.block.order:bed, pop.id:mf, rep, Unique.ID) %>% 
+  mutate(rep=as.character(rep))
+
+survey_pops <- survey %>% 
+  left_join(popinfo_2025)
+
+names(survey_pops)
 ```
-MERGE IN POP INFO FOR STATUS/POP.TYPE INFO 
+
 ```{r}
-survey <- survey %>%
-  select(bed, column=col, row, status, pop.id, mf, rep, Unique.ID)  %>%
+survey_pops_merge <- survey_pops %>%
+  select(bed.block.order:column.order, bed, column=col, row, block_2025=block, status, pop.id:rep, Unique.ID)  %>%
   mutate(bed = tolower(bed),
-         new_status=if_else(status=="2023-survivor", "2023-survivor", "2024-survivor"),
+         new_status=if_else(status=="available", "2025-survivor", status),
          column=case_match(column,
                         "A" ~ 1,
                         "B" ~ 2,
                         "C" ~ 3,
                         "D" ~ 4
                         )) %>% 
-  select(-status)
+  select(-status) %>% 
+  mutate(row=as.numeric(row))
 
-plan3 <- left_join(plan3, survey) %>%
+plan3 <- left_join(plan3, survey_pops_merge) %>%
   mutate(status = ifelse(is.na(new_status), status, new_status)) %>%
   select(-new_status)
 ```
 
-Add buffers at the beginning and end of each bed
+### Add buffers at the beginning and end of each bed
 
 ```{r}
 plan3 <- plan3 %>%
   
   #top buffers:
-  mutate(buffer=(row<=5 & str_detect(bed, "[c-h]")),
+  mutate(buffer=(row<=5 & str_detect(bed, "[c-g]")),
 
   #bottom buffers
-         buffer=ifelse(row > (bedrows[bedcol]-2) & row <= bedrows[bedcol] & str_detect(bed, "[c-h]"), TRUE, buffer),
+         buffer=ifelse(row > (bedrows[bedcol]-2) & row <= bedrows[bedcol] & str_detect(bed, "[c-g]"), TRUE, buffer),
          status=ifelse(buffer, "buffer", status)
   )
 ```
 
-CHECK THAT NO ALIVE PLANTS IN THE NEW BUFFER REGION!!
+### CHECK THAT NO ALIVE PLANTS IN THE NEW BUFFER REGION
+```{r}
+plan3 %>% filter(isTRUE(buffer)) %>% filter(!is.na(Unique.ID)) #none
+plan3 %>% filter(!is.na(Unique.ID), status=="available")
+plan3 %>% filter(!is.na(Unique.ID))
+```
 
-Plot it
+### Plot it
 
 ```{r, fig.width=12, eval=TRUE}
 
 plan3 %>%
   ggplot(aes(x0=x_pos, y0=y_pos, r=radius, fill=status)) +
   geom_circle(alpha=.75) + 
-  scale_fill_manual(values=c("out-of-bounds"="grey40", "available"="lightgreen", "2023-survivor"="blue", "2024-survivor"="magenta", "buffer"="yellow")) +
+  scale_fill_manual(values=c("out-of-bounds"="grey40", "available"="lightgreen", "2024-survivor"="blue", "2025-survivor"="magenta", "buffer"="yellow")) +
   coord_equal() + 
   #  geom_text(aes(x=x_pos, y=y_pos, label=bed), size= 14, data = bed.labels, inherit.aes = FALSE) + 
   theme(axis.text = element_text(size=18), axis.title = element_text(size=18)) +
@@ -406,8 +397,11 @@ plan3 %>%
   scale_y_reverse() +
   ggtitle(str_c("Total available positions = ", sum(plan3$status=="available")))
 
-ggsave("../output/2025-WL2-FieldPlan.jpeg", width = 10, height = 6)
+ggsave("../output/2026-WL2-FieldPlan.jpeg", width = 10, height = 6)
 ```
+*Note: not enough spots if assume that all plants alive 
+
+### This is where Brandie is in the code 
 
 Position blocks in the available spots
 
@@ -421,7 +415,7 @@ blocks <-rep(blocksizes$block, time=blocksizes$n)
 
 avail <- plan3 %>%
   filter(status=="available") %>%
-  arrange(bed, row, column) %>%
+  arrange(bed, row, column) %>% #try arranging this so that even beds are flipped (to allow snaking)
   magrittr::extract(1:length(blocks),) %>%
   mutate(block=blocks) %>%
   group_by(block) %>%
